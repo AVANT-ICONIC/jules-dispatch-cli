@@ -31,6 +31,11 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .option('--json', 'Output raw JSON')
     .action(async (opts: { repo?: string; state?: string; json?: boolean }) => {
       try {
+        const VALID_STATES = ['IN_PROGRESS', 'COMPLETED', 'WAITING_FOR_INPUT', 'PLAN_READY', 'FAILED', 'ALL'];
+        if (opts.state && !VALID_STATES.includes(opts.state)) {
+          printError(`Invalid --state "${opts.state}". Valid values: ${VALID_STATES.join(', ')}`, 1, opts.json ?? false);
+        }
+
         const client = new JulesClient(config.julesApiKey);
         const response = await client.listSessions(100);
         let list = response.sessions;
