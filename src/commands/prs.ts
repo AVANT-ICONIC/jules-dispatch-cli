@@ -31,6 +31,7 @@ export function registerPrsCommands(program: Command, config: Config): void {
         const enriched: EnrichedPR[] = [];
         for (const session of response.sessions) {
           if (!session.outputs) continue;
+          if (!session.sourceContext?.source) continue;
 
           // Optional repo filter
           if (opts.repo) {
@@ -53,6 +54,7 @@ export function registerPrsCommands(program: Command, config: Config): void {
         if (opts.repo && enriched.length > 0) {
           try {
             const ghPRs = await listOpenPRs(opts.repo);
+            // GHPullRequest.headRefName matches PullRequestOutput.headRef — same branch, different field names from each API
             const ghByHead = new Map(ghPRs.map(p => [p.headRefName, p.state]));
             for (const e of enriched) {
               e.ghState = ghByHead.get(e.pr.headRef) ?? 'unknown';
@@ -99,7 +101,7 @@ export function registerPrsCommands(program: Command, config: Config): void {
             `URL:     ${pr.url}`,
             `Branch:  ${pr.headRefName}`,
             ``,
-            pr.body,
+            pr.body ?? '',
           ]);
         }
       } catch (e: any) {
