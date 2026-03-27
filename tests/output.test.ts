@@ -27,6 +27,7 @@ describe('printError', () => {
     const exit = spyOn(process, 'exit').mockImplementation((() => {}) as any);
     printError('something broke', 1, true);
     expect(spy).toHaveBeenCalledWith(JSON.stringify({ error: 'something broke', code: 1 }));
+    expect(exit).toHaveBeenCalledWith(1);
     spy.mockRestore();
     exit.mockRestore();
   });
@@ -36,6 +37,7 @@ describe('printError', () => {
     const exit = spyOn(process, 'exit').mockImplementation((() => {}) as any);
     printError('something broke', 1, false);
     expect(spy).toHaveBeenCalledWith('Error: something broke');
+    expect(exit).toHaveBeenCalledWith(1);
     spy.mockRestore();
     exit.mockRestore();
   });
