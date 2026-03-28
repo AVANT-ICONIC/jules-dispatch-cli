@@ -59,7 +59,7 @@ Session object fields: `name`, `title`, `createTime`, `updateTime`, `state`, `so
 ]
 ```
 
-**Session create payload:** Must be wrapped in `{ "session": { ... } }` — not flat JSON.
+**Session create payload:** FLAT object — do NOT wrap in `{ "session": { ... } }`. The wrapped form returns `400 INVALID_ARGUMENT`. Confirmed against live API 2026-03-28.
 
 ### Activities
 

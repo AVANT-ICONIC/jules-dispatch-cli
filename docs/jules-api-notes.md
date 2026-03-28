@@ -61,7 +61,7 @@ The Google API design guide suggests wrapping resource creation payloads as `{ "
 }
 ```
 
-Sending the wrapped form results in a 400 or silently ignores the payload.
+Sending the wrapped form results in a `400 INVALID_ARGUMENT` error: `"Unknown name \"session\" at 'session': Cannot find field."` — verified against the live API on 2026-03-28.
 
 The `title` and `requirePlanApproval` fields are optional. Omitting `title` creates an untitled session. Omitting `requirePlanApproval` defaults to `false` (instant execution mode).
 
