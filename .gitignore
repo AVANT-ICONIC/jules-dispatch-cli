@@ -1,5 +1,22 @@
+# Secrets
 .env
+
+# Build output
 dist/
+
+# Dependencies
 node_modules/
-*.js.map
 .bun/
+
+# Source maps
+*.js.map
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Internal development files (Claude Code, planning docs)
+.claude/
+docs/superpowers/

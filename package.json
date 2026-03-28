@@ -3,6 +3,24 @@
   "version": "0.1.0",
   "description": "Agent-first CLI for Google Jules — dispatch jobs, monitor sessions, handle PRs without touching the web UI",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AVANT-ICONIC/jules-dispatch"
+  },
+  "homepage": "https://github.com/AVANT-ICONIC/jules-dispatch#readme",
+  "bugs": {
+    "url": "https://github.com/AVANT-ICONIC/jules-dispatch/issues"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "keywords": [
+    "jules",
+    "google-jules",
+    "cli",
+    "ai-agent",
+    "automation"
+  ],
   "bin": {
     "jules": "./src/index.ts"
   },

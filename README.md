@@ -24,26 +24,41 @@ cp .env.example .env
 
 ## Usage
 
+Run directly with Bun:
+
+```bash
+bun run dev sources list
+```
+
+Or build a single portable binary first (recommended):
+
+```bash
+bun run build        # produces dist/jules
+./dist/jules sources list
+```
+
+Examples:
+
 ```bash
 # List connected repos
-bun run src/index.ts sources list
+jules sources list
 
 # Dispatch a job to Jules
-bun run src/index.ts sessions create \
+jules sessions create \
   --repo owner/repo \
   --prompt "Fix the bug in auth middleware where tokens expire too early"
 
 # Check status
-bun run src/index.ts sessions get SESSION_ID
+jules sessions get SESSION_ID
 
-# Approve Jules's plan
-bun run src/index.ts sessions approve SESSION_ID
+# Approve Jules's plan (when --approve-plan was used)
+jules sessions approve SESSION_ID
 
 # View Jules's PR
-bun run src/index.ts prs view PR_NUMBER --repo owner/repo
+jules prs view PR_NUMBER --repo owner/repo
 
 # Merge it
-bun run src/index.ts prs merge PR_NUMBER --repo owner/repo
+jules prs merge PR_NUMBER --repo owner/repo
 ```
 
 ## Agent Mode (--json)
@@ -51,18 +66,17 @@ bun run src/index.ts prs merge PR_NUMBER --repo owner/repo
 Every command supports `--json` for machine-readable output with no noise:
 
 ```bash
-bun run src/index.ts sessions list --state IN_PROGRESS --json
+jules sessions list --state IN_PROGRESS --json
 ```
 
 See [AGENTS.md](./AGENTS.md) for the full agent integration guide.
 
-## Build a single binary
+## Documentation
 
-```bash
-bun run build
-# Produces: dist/jules
-./dist/jules sources list
-```
+- [Getting Started](./docs/getting-started.md)
+- [Command Reference](./docs/command-reference.md)
+- [Agent Integration Guide](./docs/agent-guide.md)
+- [Jules API Notes](./docs/jules-api-notes.md)
 
 ## License
 
