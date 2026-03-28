@@ -97,14 +97,12 @@ export interface ListActivitiesResponse {
   nextPageToken?: string;
 }
 
-// Jules API — Session create payload (must be wrapped in { session: ... })
+// Jules API — Session create payload (flat object, not nested)
 export interface CreateSessionPayload {
-  session: {
-    prompt: string;
-    sourceContext: SourceContext;
-    title?: string;
-    requirePlanApproval?: boolean;
-  };
+  prompt: string;
+  sourceContext: SourceContext;
+  title?: string;
+  requirePlanApproval?: boolean;
 }
 
 // Jules API — Error shape

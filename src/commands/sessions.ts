@@ -115,14 +115,12 @@ export function registerSessionsCommands(program: Command, config: Config): void
       try {
         const client = new JulesClient(config.julesApiKey);
         const session = await client.createSession({
-          session: {
-            prompt: opts.prompt,
-            title: opts.title,
-            requirePlanApproval: opts.approvePlan ?? false,
-            sourceContext: {
-              source: `sources/github/${opts.repo}`,
-              githubRepoContext: { startingBranch: opts.branch },
-            },
+          prompt: opts.prompt,
+          title: opts.title,
+          requirePlanApproval: opts.approvePlan ?? false,
+          sourceContext: {
+            source: `sources/github/${opts.repo}`,
+            githubRepoContext: { startingBranch: opts.branch },
           },
         });
         if (opts.json) {

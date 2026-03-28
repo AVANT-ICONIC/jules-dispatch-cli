@@ -28,7 +28,7 @@ export async function viewPR(prNumber: number, repo: string): Promise<GHPullRequ
 
 /** Merge a PR with merge commit. */
 export async function mergePR(prNumber: number, repo: string): Promise<void> {
-  await $`gh pr merge ${prNumber} --repo ${repo} --merge --yes`;
+  await $`gh pr merge ${prNumber} --repo ${repo} --merge`;
 }
 
 /** Post a comment on a PR. */
