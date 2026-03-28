@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from 'commander';
 import { loadConfig } from './config.ts';
-import { printError } from './output.ts';
 import { registerSourcesCommands } from './commands/sources.ts';
 import { registerSessionsCommands } from './commands/sessions.ts';
 import { registerPrsCommands } from './commands/prs.ts';
