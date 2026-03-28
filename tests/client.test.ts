@@ -37,17 +37,16 @@ describe('JulesClient', () => {
     );
   });
 
-  it('createSession wraps payload in { session: ... }', async () => {
+  it('createSession sends flat payload (no session wrapper)', async () => {
     const spy = mockFetch({ id: '123', name: 'sessions/123' });
     const client = new JulesClient('my-key');
     await client.createSession({
-      session: {
-        prompt: 'do the thing',
-        sourceContext: { source: 'sources/github/owner/repo' },
-      },
+      prompt: 'do the thing',
+      sourceContext: { source: 'sources/github/owner/repo' },
     });
     const callBody = JSON.parse((spy.mock.calls[0][1] as RequestInit).body as string);
-    expect(callBody).toHaveProperty('session.prompt', 'do the thing');
+    expect(callBody).toHaveProperty('prompt', 'do the thing');
+    expect(callBody).not.toHaveProperty('session');
   });
 
   it('throws on non-ok response with API error message', async () => {
