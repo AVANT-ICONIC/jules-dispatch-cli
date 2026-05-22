@@ -185,11 +185,13 @@ Creates a new Jules session and dispatches a job.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--repo owner/repo` | - | **Required.** The repository to work in |
+| `--repo owner/repo` | - | Target repository. **Omit for repoless sessions** — spawns a serverless cloud dev environment |
 | `--prompt "..."` | - | **Required.** The task description for Jules |
-| `--branch BRANCH` | `main` | The branch Jules should start from |
+| `--branch BRANCH` | `main` | The branch Jules should start from (ignored in repoless mode) |
 | `--title "..."` | - | Optional short title for the session |
+| `--automation-mode AUTO_CREATE_PR` | - | Auto-create a PR when the session completes |
 | `--approve-plan` | false | Require plan approval before Jules executes (see below) |
+| `--env-vars` | false | Make repository environment variables available to Jules |
 | `--json` | false | Output raw JSON |
 
 **Execution modes:**
@@ -214,6 +216,22 @@ Session created
   State:  IN_PROGRESS
   Repo:   acme-org/backend
   Title:  Add input validation
+```
+
+**Repoless example (no --repo):**
+
+```bash
+bun run src/index.ts sessions create \
+  --prompt "Create a Python script that validates IPv6 addresses" \
+  --title "IPv6 validator"
+```
+
+```
+Session created
+
+  ID:     sess_repoless_abc
+  State:  IN_PROGRESS
+  URL:    https://jules.google.com/sessions/sess_repoless_abc
 ```
 
 **Human output example (plan review mode):**
@@ -256,9 +274,53 @@ bun run src/index.ts sessions create \
 
 ---
 
+### `sessions message`
+
+Sends a message to Jules using the official `:sendMessage` API endpoint. **Preferred over `reply` for new integrations.**
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<session-id>` | The session ID |
+| `<prompt>` | Your message or follow-up prompt to Jules |
+
+**Options:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--json` | false | Output raw JSON |
+
+**Human output example:**
+
+```bash
+bun run src/index.ts sessions message sess_abc123def456 "Can you make the app corgi themed?"
+```
+
+```
+Message sent to session sess_abc123def456.
+```
+
+**JSON output example:**
+
+```bash
+bun run src/index.ts sessions message sess_abc123def456 "Corgi theme please" --json
+```
+
+```json
+{
+  "ok": true,
+  "sessionId": "sess_abc123def456"
+}
+```
+
+---
+
 ### `sessions reply`
 
-Sends a message to Jules when the session is in `WAITING_FOR_INPUT` state.
+Sends a message to Jules when the session is in `WAITING_FOR_INPUT` state. **Legacy endpoint — prefer `sessions message` for new integrations.**
+
+
 
 **Arguments:**
 

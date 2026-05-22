@@ -14,7 +14,7 @@ bun run src/index.ts sources list --json
 If you get a non-empty array, you are authenticated and ready. If you get an error,
 the `.env` file is missing or the API key is invalid - stop and report to the user.
 
-## Dispatching a Job (Instant Mode)
+## Dispatching a Job (Repo Mode)
 
 Jules will execute immediately and open a PR when done:
 
@@ -27,6 +27,44 @@ bun run src/index.ts sessions create \
 ```
 
 Save the `id` field from the JSON response. You will need it to monitor progress.
+
+### Dispatching a Repoless Job
+
+Omit `--repo` to spawn a serverless cloud dev environment with no source repo.
+Jules provides Node, Python, Rust, and Bun preloaded. Useful for prototypes,
+scripts, and experiments:
+
+```bash
+bun run src/index.ts sessions create \
+  --prompt "Create a Python script that validates IPv6 addresses" \
+  --title "IPv6 validator" \
+  --json
+```
+
+### Auto-Creating PRs
+
+Use `--automation-mode AUTO_CREATE_PR` to have Jules automatically open a PR
+when the session completes (skip manual review):
+
+```bash
+bun run src/index.ts sessions create \
+  --repo OWNER/REPO \
+  --prompt "..." \
+  --automation-mode AUTO_CREATE_PR \
+  --json
+```
+
+### Enabling Environment Variables
+
+Pass `--env-vars` to make your repository's environment variables available to Jules:
+
+```bash
+bun run src/index.ts sessions create \
+  --repo OWNER/REPO \
+  --prompt "..." \
+  --env-vars \
+  --json
+```
 
 ## Dispatching a Job (Plan Review Mode)
 
@@ -66,10 +104,34 @@ When state is `WAITING_FOR_INPUT` or `PLAN_READY`:
 bun run src/index.ts sessions activities SESSION_ID --json
 ```
 
-Activities with `agentMessaged` are from Jules. Read the `agentMessage` field.
-Activities with `userMessaged` are from you or the user.
+Activities use a discriminated union — check which key is present:
+
+| Key | Sender | Description |
+|-----|--------|-------------|
+| `planGenerated` | Jules | Plan with steps was generated |
+| `planApproved` | User | Plan was approved |
+| `progressUpdated` | Jules | Step progress update (title, description) |
+| `agentMessaged` | Jules | Jules sent a message |
+| `userMessaged` | User/Agent | A reply was sent |
+
+### Incremental Polling
+
+Use `--create-time` to only fetch activities since your last poll (avoids re-processing):
+
+```bash
+LAST_TIME="2026-01-17T00:03:53.137240Z"
+bun run src/index.ts sessions activities SESSION_ID --create-time "$LAST_TIME" --json
+```
 
 ## Replying to Jules
+
+Prefer the official `message` command (uses `:sendMessage` endpoint):
+
+```bash
+bun run src/index.ts sessions message SESSION_ID "Your prompt or answer here" --json
+```
+
+Legacy `reply` is still available for backwards compatibility:
 
 ```bash
 bun run src/index.ts sessions reply SESSION_ID "Your answer here" --json
@@ -110,6 +172,7 @@ bun run src/index.ts prs comment PR_NUMBER --repo OWNER/REPO "Feedback here" --j
 3. Run `sources list` once per session - cache the result
 4. Use `sessions list --state IN_PROGRESS --json` to get an overview before diving into individual sessions
 5. Read `session.outputs` from `sessions get` before calling `prs list` - the PR URL is already there
+6. Use `--create-time` with incremental polling to avoid re-fetching old activities
 
 ## Exit Codes
 

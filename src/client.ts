@@ -4,6 +4,7 @@ import type {
   Session,
   ListActivitiesResponse,
   CreateSessionPayload,
+  SendMessagePayload,
 } from './types.ts';
 
 const BASE_URL = 'https://jules.googleapis.com/v1alpha';
@@ -36,7 +37,6 @@ export class JulesClient {
         continue;
       }
 
-      // Read body as text first — res.json() throws SyntaxError on non-JSON
       const text = await res.text();
       let data: any;
       try {
@@ -75,6 +75,16 @@ export class JulesClient {
     });
   }
 
+  /** Send a message to Jules via the :sendMessage endpoint (official API, post-Jan 2026). */
+  sendMessage(sessionId: string, prompt: string): Promise<unknown> {
+    const payload: SendMessagePayload = { prompt };
+    return this.request(`/sessions/${sessionId}:sendMessage`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** @deprecated Legacy reply endpoint. Prefer sendMessage for new integrations. */
   replyToSession(sessionId: string, message: string): Promise<unknown> {
     return this.request(`/sessions/${sessionId}/activities`, {
       method: 'POST',
@@ -89,7 +99,15 @@ export class JulesClient {
     });
   }
 
-  listActivities(sessionId: string, pageSize = 20): Promise<ListActivitiesResponse> {
-    return this.request(`/sessions/${sessionId}/activities?pageSize=${pageSize}`);
+  listActivities(
+    sessionId: string,
+    pageSize = 20,
+    createTime?: string,
+  ): Promise<ListActivitiesResponse> {
+    let path = `/sessions/${sessionId}/activities?pageSize=${pageSize}`;
+    if (createTime) {
+      path += `&createTime=${encodeURIComponent(createTime)}`;
+    }
+    return this.request(path);
   }
 }

@@ -7,12 +7,31 @@ import type { Session, Activity } from '../types.ts';
 function formatSession(s: Session): string {
   const pr = s.outputs?.find(o => o.pullRequest)?.pullRequest;
   const prInfo = pr ? `  PR: ${pr.url}` : '';
-  return `[${s.state}]  ${s.id}  ${s.title ?? '(no title)'}${prInfo}`;
+  const repo = s.sourceContext.source ?? '(repoless)';
+  return `[${s.state}]  ${s.id}  ${repo}  ${s.title ?? '(no title)'}${prInfo}`;
 }
 
 function formatActivity(a: Activity): string {
   const who = a.originator === 'agent' ? 'Jules' : 'User ';
-  const msg = a.agentMessaged?.agentMessage ?? a.userMessaged?.userMessage ?? '(no message)';
+  let msg = '';
+
+  if (a.planGenerated) {
+    const steps = a.planGenerated.plan.steps.map(s => s.title).join('; ');
+    msg = `Plan generated (${a.planGenerated.plan.steps.length} steps): ${steps}`;
+  } else if (a.planApproved) {
+    msg = `Plan approved: ${a.planApproved.planId}`;
+  } else if (a.progressUpdated) {
+    msg = a.progressUpdated.description
+      ? `${a.progressUpdated.title}: ${a.progressUpdated.description}`
+      : a.progressUpdated.title;
+  } else if (a.agentMessaged) {
+    msg = a.agentMessaged.agentMessage;
+  } else if (a.userMessaged) {
+    msg = a.userMessaged.userMessage;
+  } else {
+    msg = '(unknown activity type)';
+  }
+
   const preview = msg.length > 200 ? msg.slice(0, 200) + '...' : msg;
   return `[${a.createTime}] ${who}: ${preview}`;
 }
@@ -76,11 +95,12 @@ export function registerSessionsCommands(program: Command, config: Config): void
         if (opts.json) {
           printJson({ session, activities: activitiesRes.activities });
         } else {
+          const repo = session.sourceContext.source ?? '(repoless)';
           printHuman([
             `ID:      ${session.id}`,
             `Title:   ${session.title ?? '(no title)'}`,
             `State:   ${session.state}`,
-            `Repo:    ${session.sourceContext.source}`,
+            `Repo:    ${repo}`,
             `Updated: ${session.updateTime}`,
             `URL:     ${session.url}`,
             '',
@@ -97,31 +117,43 @@ export function registerSessionsCommands(program: Command, config: Config): void
   sessions
     .command('create')
     .description('Dispatch a new Jules job')
-    .requiredOption('--repo <owner/repo>', 'Target repository (e.g. AVANT-ICONIC/my-repo)')
+    .option('--repo <owner/repo>', 'Target repository (omit for repoless session)')
     .requiredOption('--prompt <text>', 'Task description for Jules')
     .option('--branch <branch>', 'Branch to start from', 'main')
     .option('--title <title>', 'Session title')
+    .option('--automation-mode <mode>', 'Automation mode: AUTO_CREATE_PR')
     .option('--approve-plan', 'Require plan approval before Jules executes')
+    .option('--env-vars', 'Enable environment variables for the session')
     .option('--json', 'Output raw JSON')
     .action(async (opts: {
-      repo: string;
+      repo?: string;
       prompt: string;
       branch: string;
       title?: string;
+      automationMode?: string;
       approvePlan?: boolean;
+      envVars?: boolean;
       json?: boolean;
     }) => {
       try {
         const client = new JulesClient(config.julesApiKey);
+
+        const sourceContext = opts.repo
+          ? {
+              source: `sources/github/${opts.repo}`,
+              githubRepoContext: { startingBranch: opts.branch },
+              environmentVariablesEnabled: opts.envVars ?? false,
+            }
+          : undefined;
+
         const session = await client.createSession({
           prompt: opts.prompt,
           title: opts.title,
+          sourceContext,
           requirePlanApproval: opts.approvePlan ?? false,
-          sourceContext: {
-            source: `sources/github/${opts.repo}`,
-            githubRepoContext: { startingBranch: opts.branch },
-          },
+          automationMode: opts.automationMode as any,
         });
+
         if (opts.json) {
           printJson({ id: session.id, state: session.state, url: session.url });
         } else {
@@ -131,6 +163,9 @@ export function registerSessionsCommands(program: Command, config: Config): void
             `  State: ${session.state}`,
             `  URL:   ${session.url}`,
           ];
+          if (opts.automationMode) {
+            lines.push(`  Mode:  ${opts.automationMode}`);
+          }
           if (opts.approvePlan) {
             lines.push(
               ``,
@@ -150,10 +185,29 @@ export function registerSessionsCommands(program: Command, config: Config): void
       }
     });
 
-  // reply
+  // message — official :sendMessage endpoint (post-Jan 2026)
+  sessions
+    .command('message <session-id> <prompt>')
+    .description('Send a message/prompt to Jules (official API endpoint)')
+    .option('--json', 'Output raw JSON')
+    .action(async (sessionId: string, prompt: string, opts: { json?: boolean }) => {
+      try {
+        const client = new JulesClient(config.julesApiKey);
+        await client.sendMessage(sessionId, prompt);
+        if (opts.json) {
+          printJson({ ok: true, sessionId });
+        } else {
+          printHuman([`Message sent to session ${sessionId}.`]);
+        }
+      } catch (e: any) {
+        printError(e.message, 1, opts.json ?? false);
+      }
+    });
+
+  // reply — legacy endpoint, kept for backwards compatibility
   sessions
     .command('reply <session-id> <message>')
-    .description('Send a message to Jules in a session')
+    .description('Send a message to Jules (legacy endpoint)')
     .option('--json', 'Output raw JSON')
     .action(async (sessionId: string, message: string, opts: { json?: boolean }) => {
       try {
@@ -193,15 +247,16 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .command('activities <session-id>')
     .description('Show the activity log for a session')
     .option('--limit <n>', 'Number of activities to fetch', '20')
+    .option('--create-time <timestamp>', 'Only fetch activities created after this ISO timestamp')
     .option('--json', 'Output raw JSON')
-    .action(async (sessionId: string, opts: { limit?: string; json?: boolean }) => {
+    .action(async (sessionId: string, opts: { limit?: string; createTime?: string; json?: boolean }) => {
       try {
         const pageSize = Number.parseInt(opts.limit ?? '20', 10);
         if (!Number.isFinite(pageSize) || pageSize < 1) {
           printError(`Invalid --limit "${opts.limit}". Must be a positive number.`, 1, opts.json ?? false);
         }
         const client = new JulesClient(config.julesApiKey);
-        const response = await client.listActivities(sessionId, pageSize);
+        const response = await client.listActivities(sessionId, pageSize, opts.createTime);
         if (opts.json) {
           printJson(response.activities);
         } else if (response.activities.length === 0) {
