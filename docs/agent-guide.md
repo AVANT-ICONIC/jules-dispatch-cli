@@ -1,18 +1,18 @@
 # Agent Guide
 
-This guide is for AI agents — Claude Code, Codex, Gemini, or any orchestration script — that want to use `jules-dispatch` to delegate coding tasks to Google Jules without human intervention.
+This guide is for AI agents - Claude Code, Codex, Gemini, or any orchestration script - that want to use `jules-dispatch` to delegate coding tasks to Google Jules without human intervention.
 
 ---
 
 ## Core Principles
 
-1. **Always use `--json`** — every command supports it. Human-readable output contains formatting noise that is expensive to parse. JSON output is clean, typed, and stable.
+1. **Always use `--json`** - every command supports it. Human-readable output contains formatting noise that is expensive to parse. JSON output is clean, typed, and stable.
 
-2. **Never poll faster than 30 seconds** — Jules is an async agent. It runs in the cloud and typically takes 2–10 minutes per job. Polling faster does not speed it up and wastes tokens reading identical state.
+2. **Never poll faster than 30 seconds** - Jules is an async agent. It runs in the cloud and typically takes 2–10 minutes per job. Polling faster does not speed it up and wastes tokens reading identical state.
 
-3. **Jules is async** — `sessions create` returns immediately. The session starts `IN_PROGRESS`. You must poll `sessions get` to track progress.
+3. **Jules is async** - `sessions create` returns immediately. The session starts `IN_PROGRESS`. You must poll `sessions get` to track progress.
 
-4. **Save the session ID** — it is the primary key for all subsequent operations. Extract it from the `sessions create` JSON response: `.name` contains `sessions/SESS_ID`; many commands also expose `.id` directly.
+4. **Save the session ID** - it is the primary key for all subsequent operations. Extract it from the `sessions create` JSON response: `.name` contains `sessions/SESS_ID`; many commands also expose `.id` directly.
 
 ---
 
@@ -155,7 +155,7 @@ fi
 | Code | Meaning |
 |---|---|
 | `0` | Success |
-| `1` | Error — check stderr for JSON error object |
+| `1` | Error - check stderr for JSON error object |
 
 ### What to do when `FAILED`
 
@@ -163,9 +163,9 @@ fi
    ```bash
    bun run src/index.ts sessions activities "$SESSION" --json
    ```
-2. Look for the last `agentMessaged` entry — it usually describes the failure.
+2. Look for the last `agentMessaged` entry - it usually describes the failure.
 3. Common causes:
-   - Prompt was too vague — Jules could not determine what to change
+   - Prompt was too vague - Jules could not determine what to change
    - The repo has a CI requirement that Jules's change did not satisfy
    - Jules hit a merge conflict on the target branch
    - The GitHub App lacks write access to the repo
@@ -223,7 +223,7 @@ while true; do
       bun run src/index.ts sessions approve "$SESSION" --json
       ;;
     IN_PROGRESS)
-      # Normal — keep polling
+      # Normal - keep polling
       ;;
     *)
       echo "Unknown state: $STATE"
@@ -234,9 +234,9 @@ done
 
 **Exit codes from this script:**
 
-- `0` — completed successfully, PR URL printed
-- `1` — Jules failed
-- `2` — Jules needs human input (only if `--approve-plan` was used)
+- `0` - completed successfully, PR URL printed
+- `1` - Jules failed
+- `2` - Jules needs human input (only if `--approve-plan` was used)
 
 ---
 
@@ -244,11 +244,11 @@ done
 
 ### Claude Code
 
-Use `bun run src/index.ts` directly in Bash tool calls. Parse JSON with `jq`. Store session IDs in bash variables within the same Bash call chain — do not rely on state persisting across Bash tool calls.
+Use `bun run src/index.ts` directly in Bash tool calls. Parse JSON with `jq`. Store session IDs in bash variables within the same Bash call chain - do not rely on state persisting across Bash tool calls.
 
 ### Codex / GPT agents
 
-Same approach. All commands are synchronous from the shell's perspective — they return immediately with JSON. Async behavior is Jules's; your agent just polls.
+Same approach. All commands are synchronous from the shell's perspective - they return immediately with JSON. Async behavior is Jules's; your agent just polls.
 
 ### CI/CD pipelines
 

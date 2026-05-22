@@ -26,7 +26,7 @@ X-Goog-Api-Key: YOUR_JULES_API_KEY
 
 Obtain a key from jules.google.com > Settings > API Keys. Keys are tied to your Jules account and have access to whatever repos you have connected.
 
-There is no OAuth flow in this CLI — API key only.
+There is no OAuth flow in this CLI - API key only.
 
 ---
 
@@ -61,7 +61,7 @@ The Google API design guide suggests wrapping resource creation payloads as `{ "
 }
 ```
 
-Sending the wrapped form results in a `400 INVALID_ARGUMENT` error: `"Unknown name \"session\" at 'session': Cannot find field."` — verified against the live API on 2026-03-28.
+Sending the wrapped form results in a `400 INVALID_ARGUMENT` error: `"Unknown name \"session\" at 'session': Cannot find field."` - verified against the live API on 2026-03-28.
 
 The `title` and `requirePlanApproval` fields are optional. Omitting `title` creates an untitled session. Omitting `requirePlanApproval` defaults to `false` (instant execution mode).
 
@@ -87,8 +87,8 @@ The activities array does not use a `type` field to distinguish activity kinds. 
 
 | Key | Sender | Description |
 |---|---|---|
-| `agentMessaged` | Jules | Contains `agentMessage` string — Jules speaking to the user |
-| `userMessaged` | Human or agent | Contains `userMessage` string — a reply sent via the reply endpoint |
+| `agentMessaged` | Jules | Contains `agentMessage` string - Jules speaking to the user |
+| `userMessaged` | Human or agent | Contains `userMessage` string - a reply sent via the reply endpoint |
 
 To determine who sent an activity, check which key is present:
 
@@ -100,7 +100,7 @@ if (activity.agentMessaged) {
 }
 ```
 
-Do not try to read a `.type` field — it does not exist.
+Do not try to read a `.type` field - it does not exist.
 
 ---
 
@@ -136,7 +136,7 @@ Request body:
 }
 ```
 
-The body mirrors the discriminated union structure of the activities response — the `userMessaged` key wraps your message. Do not send a flat `{ "message": "..." }` — it will be ignored.
+The body mirrors the discriminated union structure of the activities response - the `userMessaged` key wraps your message. Do not send a flat `{ "message": "..." }` - it will be ignored.
 
 ---
 
@@ -149,7 +149,7 @@ When a session reaches `COMPLETED`, the session object includes an `outputs` arr
 | `pullRequest` | Jules opened a GitHub PR. Contains `url` and `number`. |
 | `changeSet` | Jules produced a git patch but did not open a PR. |
 
-**Both entries can appear together** — Jules may produce a changeSet and then open a PR from it. Check for both.
+**Both entries can appear together** - Jules may produce a changeSet and then open a PR from it. Check for both.
 
 **The `pullRequest` entry may be absent** if the Jules GitHub App does not have write access to the repository. In that case Jules will produce only a `changeSet` (a git patch) that you would need to apply manually. This is uncommon if the GitHub App was installed correctly, but it does happen on forks or repos with restricted branch protection.
 
@@ -213,7 +213,7 @@ Common status codes encountered in practice:
 | 401 | `UNAUTHENTICATED` | Missing or invalid API key |
 | 403 | `PERMISSION_DENIED` | API key lacks access to the requested resource |
 | 404 | `NOT_FOUND` | Session/source ID does not exist, or endpoint not yet released |
-| 429 | `RESOURCE_EXHAUSTED` | Rate limit hit — back off and retry |
+| 429 | `RESOURCE_EXHAUSTED` | Rate limit hit - back off and retry |
 
 ---
 
@@ -221,6 +221,6 @@ Common status codes encountered in practice:
 
 - No schedules endpoint (404)
 - No pagination in this CLI (pageSize=100 cap)
-- No streaming — all responses are synchronous snapshots; poll to track progress
-- Session IDs are opaque strings — do not try to parse structure from them
+- No streaming - all responses are synchronous snapshots; poll to track progress
+- Session IDs are opaque strings - do not try to parse structure from them
 - Sessions cannot be cancelled or deleted via the API

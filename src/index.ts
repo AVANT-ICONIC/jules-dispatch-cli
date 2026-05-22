@@ -6,24 +6,28 @@ import { registerSessionsCommands } from './commands/sessions.ts';
 import { registerPrsCommands } from './commands/prs.ts';
 
 const program = new Command();
+const pkg = JSON.parse(await Bun.file(new URL('../package.json', import.meta.url)).text());
 
 program
   .name('jules')
   .description('Agent-first CLI for Google Jules.\nDocs: https://github.com/AVANT-ICONIC/jules-dispatch')
-  .version('0.1.0');
+  .version(pkg.version);
 
-let config;
-try {
-  config = loadConfig();
-} catch (e: any) {
-  // Use plain text error — we don't know --json flag yet at this point
-  console.error(`Error: ${e.message}`);
-  process.exit(1);
+
+function initConfig(): ReturnType<typeof loadConfig> {
+  try {
+    return loadConfig();
+  } catch (e: any) {
+    console.error(`Error: ${e.message}`);
+    process.exit(1);
+  }
 }
 
-registerSourcesCommands(program, config!);
-registerSessionsCommands(program, config!);
-registerPrsCommands(program, config!);
+const config = initConfig();
+
+registerSourcesCommands(program, config);
+registerSessionsCommands(program, config);
+registerPrsCommands(program, config);
 
 // Schedules: not yet supported by Jules API
 program

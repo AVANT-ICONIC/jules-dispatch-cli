@@ -4,8 +4,10 @@ import { JulesClient } from '../src/client';
 const BASE = 'https://jules.googleapis.com/v1alpha';
 
 function mockFetch(body: unknown, ok = true) {
+  const text = async () => JSON.stringify(body);
   return spyOn(globalThis, 'fetch').mockResolvedValue({
     ok,
+    text,
     json: async () => body,
   } as Response);
 }

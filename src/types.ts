@@ -1,4 +1,4 @@
-// Jules API — Session states
+// Jules API - Session states
 export type SessionState =
   | 'IN_PROGRESS'
   | 'COMPLETED'
@@ -6,7 +6,7 @@ export type SessionState =
   | 'PLAN_READY'
   | 'FAILED';
 
-// Jules API — Source (connected GitHub repo)
+// Jules API - Source (connected GitHub repo)
 export interface GitHubRepo {
   owner: string;
   repo: string;
@@ -26,7 +26,7 @@ export interface ListSourcesResponse {
   nextPageToken?: string;
 }
 
-// Jules API — Sessions
+// Jules API - Sessions
 export interface GitHubRepoContext {
   startingBranch?: string;
 }
@@ -74,7 +74,7 @@ export interface ListSessionsResponse {
   nextPageToken?: string;
 }
 
-// Jules API — Activities (discriminated union by key presence)
+// Jules API - Activities (discriminated union by key presence)
 export interface AgentMessaged {
   agentMessage: string;
 }
@@ -97,7 +97,7 @@ export interface ListActivitiesResponse {
   nextPageToken?: string;
 }
 
-// Jules API — Session create payload (flat object, not nested)
+// Jules API - Session create payload (flat object, not nested)
 export interface CreateSessionPayload {
   prompt: string;
   sourceContext: SourceContext;
@@ -105,7 +105,7 @@ export interface CreateSessionPayload {
   requirePlanApproval?: boolean;
 }
 
-// Jules API — Error shape
+// Jules API - Error shape
 export interface JulesApiError {
   error: {
     code: number;

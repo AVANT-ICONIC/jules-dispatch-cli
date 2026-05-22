@@ -1,4 +1,4 @@
-# AGENTS.md — Jules Dispatch CLI Integration Guide
+# AGENTS.md - Jules Dispatch CLI Integration Guide
 
 This document tells AI agents (Claude Code, Codex, Gemini, etc.) exactly how to use
 the `jules` CLI to manage Google Jules without human intervention.
@@ -12,7 +12,7 @@ bun run src/index.ts sources list --json
 ```
 
 If you get a non-empty array, you are authenticated and ready. If you get an error,
-the `.env` file is missing or the API key is invalid — stop and report to the user.
+the `.env` file is missing or the API key is invalid - stop and report to the user.
 
 ## Dispatching a Job (Instant Mode)
 
@@ -42,7 +42,7 @@ bun run src/index.ts sessions create \
 
 ## Monitoring a Session
 
-Poll every 30+ seconds (do not poll faster — Jules is async):
+Poll every 30+ seconds (do not poll faster - Jules is async):
 
 ```bash
 bun run src/index.ts sessions get SESSION_ID --json
@@ -105,13 +105,13 @@ bun run src/index.ts prs comment PR_NUMBER --repo OWNER/REPO "Feedback here" --j
 
 ## Token Efficiency Rules
 
-1. Always use `--json` — no human-readable noise
+1. Always use `--json` - no human-readable noise
 2. Never poll faster than 30 second intervals
-3. Run `sources list` once per session — cache the result
+3. Run `sources list` once per session - cache the result
 4. Use `sessions list --state IN_PROGRESS --json` to get an overview before diving into individual sessions
-5. Read `session.outputs` from `sessions get` before calling `prs list` — the PR URL is already there
+5. Read `session.outputs` from `sessions get` before calling `prs list` - the PR URL is already there
 
 ## Exit Codes
 
-- `0` — success
-- `1` — error (see stderr for JSON error object when using `--json`)
+- `0` - success
+- `1` - error (see stderr for JSON error object when using `--json`)

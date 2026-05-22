@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-21T00:00:22.255Z",
+  "repo": {
+    "name": "jules-dispatch",
+    "sonarKey": "jules-dispatch"
+  },
+  "file": {
+    "path": "src/commands/sessions.ts"
+  },
+  "counts": {
+    "total": 3,
+    "bySeverity": {
+      "MAJOR": 2,
+      "MINOR": 1
+    },
+    "byType": {
+      "CODE_SMELL": 3
+    }
+  },
+  "issues": [
+    {
+      "key": "db361b28-40e0-4b77-a9b3-f524f699e61e",
+      "severity": "MAJOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S6660",
+      "line": 54,
+      "message": "'If' statement should not be the only statement in 'else' block"
+    },
+    {
+      "key": "b1fee6bf-6100-451a-ac51-d6bee434c149",
+      "severity": "MAJOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S6660",
+      "line": 194,
+      "message": "'If' statement should not be the only statement in 'else' block"
+    },
+    {
+      "key": "f1dfa6fe-bee4-4ea7-a359-56a767a0d0e6",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S7773",
+      "line": 190,
+      "message": "Prefer `Number.parseInt` over `parseInt`."
+    }
+  ]
+}

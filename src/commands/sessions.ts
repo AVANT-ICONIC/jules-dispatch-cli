@@ -32,8 +32,9 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .action(async (opts: { repo?: string; state?: string; json?: boolean }) => {
       try {
         const VALID_STATES = ['IN_PROGRESS', 'COMPLETED', 'WAITING_FOR_INPUT', 'PLAN_READY', 'FAILED', 'ALL'];
-        if (opts.state && !VALID_STATES.includes(opts.state)) {
-          printError(`Invalid --state "${opts.state}". Valid values: ${VALID_STATES.join(', ')}`, 1, opts.json ?? false);
+        const stateValid = !opts.state || VALID_STATES.includes(opts.state);
+        if (opts.state && !stateValid) {
+          console.error(`Warning: unknown state "${opts.state}". Valid values: ${VALID_STATES.join(', ')}. Showing all states.`);
         }
 
         const client = new JulesClient(config.julesApiKey);
@@ -44,18 +45,16 @@ export function registerSessionsCommands(program: Command, config: Config): void
           const sourceId = `sources/github/${opts.repo}`;
           list = list.filter(s => s.sourceContext.source === sourceId);
         }
-        if (opts.state && opts.state !== 'ALL') {
+        if (opts.state && stateValid && opts.state !== 'ALL') {
           list = list.filter(s => s.state === opts.state);
         }
 
         if (opts.json) {
           printJson(list);
+        } else if (list.length === 0) {
+          printHuman(['No sessions found.']);
         } else {
-          if (list.length === 0) {
-            printHuman(['No sessions found.']);
-          } else {
-            printHuman(list.map(formatSession));
-          }
+          printHuman(list.map(formatSession));
         }
       } catch (e: any) {
         printError(e.message, 1, opts.json ?? false);
@@ -126,14 +125,25 @@ export function registerSessionsCommands(program: Command, config: Config): void
         if (opts.json) {
           printJson({ id: session.id, state: session.state, url: session.url });
         } else {
-          printHuman([
+          const lines = [
             `Session created:`,
             `  ID:    ${session.id}`,
             `  State: ${session.state}`,
             `  URL:   ${session.url}`,
-            ``,
-            `Monitor with: jules sessions get ${session.id}`,
-          ]);
+          ];
+          if (opts.approvePlan) {
+            lines.push(
+              ``,
+              `Plan approval required. Jules will pause at PLAN_READY state.`,
+              `Review and approve with: jules sessions approve ${session.id}`,
+            );
+          } else {
+            lines.push(
+              ``,
+              `Monitor with: jules sessions get ${session.id}`,
+            );
+          }
+          printHuman(lines);
         }
       } catch (e: any) {
         printError(e.message, 1, opts.json ?? false);
@@ -186,16 +196,18 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .option('--json', 'Output raw JSON')
     .action(async (sessionId: string, opts: { limit?: string; json?: boolean }) => {
       try {
+        const pageSize = Number.parseInt(opts.limit ?? '20', 10);
+        if (!Number.isFinite(pageSize) || pageSize < 1) {
+          printError(`Invalid --limit "${opts.limit}". Must be a positive number.`, 1, opts.json ?? false);
+        }
         const client = new JulesClient(config.julesApiKey);
-        const response = await client.listActivities(sessionId, parseInt(opts.limit ?? '20', 10));
+        const response = await client.listActivities(sessionId, pageSize);
         if (opts.json) {
           printJson(response.activities);
+        } else if (response.activities.length === 0) {
+          printHuman(['No activities yet.']);
         } else {
-          if (response.activities.length === 0) {
-            printHuman(['No activities yet.']);
-          } else {
-            printHuman(response.activities.map(formatActivity));
-          }
+          printHuman(response.activities.map(formatActivity));
         }
       } catch (e: any) {
         printError(e.message, 1, opts.json ?? false);

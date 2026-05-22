@@ -46,7 +46,7 @@ Run the following to confirm everything is wired up correctly:
 bun run src/index.ts sources list
 ```
 
-Expected output — your connected repositories:
+Expected output - your connected repositories:
 
 ```
 Connected sources (2)
@@ -125,7 +125,7 @@ Save that session ID.
 
 ### Step 3: Monitor progress
 
-Jules works asynchronously — jobs typically take 2–10 minutes. Poll with:
+Jules works asynchronously - jobs typically take 2–10 minutes. Poll with:
 
 ```bash
 bun run src/index.ts sessions get sess_abc123def456
@@ -133,7 +133,7 @@ bun run src/index.ts sessions get sess_abc123def456
 
 You will see the current state and recent activity. Wait until state is `COMPLETED`.
 
-Do not poll faster than every 30 seconds — Jules is async and polling faster does not speed things up.
+Do not poll faster than every 30 seconds - Jules is async and polling faster does not speed things up.
 
 ### Step 4: Find the PR
 
@@ -173,6 +173,6 @@ bun run src/index.ts prs comment 42 --repo acme-org/backend "Please also add a t
 
 ## What's Next
 
-- [Command Reference](./command-reference.md) — every flag for every command
-- [Agent Guide](./agent-guide.md) — integrate `jules-dispatch` into your AI agent workflows
-- [Jules API Notes](./jules-api-notes.md) — raw API behavior for contributors and power users
+- [Command Reference](./command-reference.md) - every flag for every command
+- [Agent Guide](./agent-guide.md) - integrate `jules-dispatch` into your AI agent workflows
+- [Jules API Notes](./jules-api-notes.md) - raw API behavior for contributors and power users

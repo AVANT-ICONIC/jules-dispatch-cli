@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-21T00:00:22.255Z",
+  "repo": {
+    "name": "jules-dispatch",
+    "path": "/Users/valunex/Desktop/GitHub/jules-dispatch",
+    "sonarKey": "jules-dispatch"
+  },
+  "scan": {
+    "status": "success",
+    "errorMessage": null,
+    "issueSnapshotStatus": "fresh",
+    "issueSnapshotGeneratedAt": "2026-05-21T00:00:22.255Z"
+  },
+  "qualityGate": {
+    "status": "OK",
+    "failedConditions": []
+  },
+  "measures": {
+    "bugs": null,
+    "codeSmells": null,
+    "coverage": null,
+    "duplicatedLinesDensity": null,
+    "maintainabilityRating": null,
+    "ncloc": null,
+    "reliabilityRating": null,
+    "securityHotspots": null,
+    "securityRating": null,
+    "vulnerabilities": null
+  },
+  "issues": {
+    "total": 15,
+    "fileCount": 5,
+    "bySeverity": {
+      "MAJOR": 5,
+      "CRITICAL": 1,
+      "MINOR": 9
+    },
+    "byType": {
+      "CODE_SMELL": 15
+    }
+  },
+  "topFiles": [
+    {
+      "path": "src/commands/prs.ts",
+      "total": 7,
+      "critical": 1,
+      "major": 1,
+      "reportPath": "issues/files/src-commands-prs-ts-25cfb2540b66.json"
+    },
+    {
+      "path": "src/commands/sessions.ts",
+      "total": 3,
+      "critical": 0,
+      "major": 2,
+      "reportPath": "issues/files/src-commands-sessions-ts-4f9f9e934bb6.json"
+    },
+    {
+      "path": "src/client.ts",
+      "total": 1,
+      "critical": 0,
+      "major": 1,
+      "reportPath": "issues/files/src-client-ts-e76fc5dc235b.json"
+    },
+    {
+      "path": "src/commands/sources.ts",
+      "total": 1,
+      "critical": 0,
+      "major": 1,
+      "reportPath": "issues/files/src-commands-sources-ts-59d27293690d.json"
+    },
+    {
+      "path": "src/index.ts",
+      "total": 3,
+      "critical": 0,
+      "major": 0,
+      "reportPath": "issues/files/src-index-ts-c5fb850250c7.json"
+    }
+  ]
+}

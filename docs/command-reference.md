@@ -62,7 +62,7 @@ Lists Jules sessions, optionally filtered by repository and/or state.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--repo owner/repo` | — | Filter to sessions for this repository |
+| `--repo owner/repo` | - | Filter to sessions for this repository |
 | `--state STATE` | `ALL` | Filter by state: `IN_PROGRESS`, `COMPLETED`, `WAITING_FOR_INPUT`, `PLAN_READY`, `FAILED`, or `ALL` |
 | `--json` | false | Output raw JSON |
 
@@ -185,10 +185,10 @@ Creates a new Jules session and dispatches a job.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--repo owner/repo` | — | **Required.** The repository to work in |
-| `--prompt "..."` | — | **Required.** The task description for Jules |
+| `--repo owner/repo` | - | **Required.** The repository to work in |
+| `--prompt "..."` | - | **Required.** The task description for Jules |
 | `--branch BRANCH` | `main` | The branch Jules should start from |
-| `--title "..."` | — | Optional short title for the session |
+| `--title "..."` | - | Optional short title for the session |
 | `--approve-plan` | false | Require plan approval before Jules executes (see below) |
 | `--json` | false | Output raw JSON |
 
@@ -248,10 +248,9 @@ bun run src/index.ts sessions create \
 
 ```json
 {
-  "name": "sessions/sess_abc123def456",
+  "id": "sess_abc123def456",
   "state": "IN_PROGRESS",
-  "title": "Fix typo in README",
-  "createTime": "2026-03-28T11:00:00Z"
+  "url": "https://jules.google.com/sessions/sess_abc123def456"
 }
 ```
 
@@ -293,9 +292,10 @@ bun run src/index.ts sessions reply sess_abc123def456 "Use the existing validato
 ```
 
 ```json
+
 {
   "ok": true,
-  "sessionState": "IN_PROGRESS"
+  "sessionId": "sess_abc123def456"
 }
 ```
 
@@ -349,7 +349,7 @@ bun run src/index.ts sessions approve sess_xyz789ghi012 --json
 
 ### `sessions activities`
 
-Lists the activity log for a session — Jules's messages, your replies, and system events.
+Lists the activity log for a session - Jules's messages, your replies, and system events.
 
 **Arguments:**
 
@@ -409,7 +409,7 @@ bun run src/index.ts sessions activities sess_abc123def456 --json
 ]
 ```
 
-Activities use a discriminated union — check which key is present (`agentMessaged` vs `userMessaged`) to determine who sent the message.
+Activities use a discriminated union - check which key is present (`agentMessaged` vs `userMessaged`) to determine who sent the message.
 
 ---
 
@@ -425,7 +425,7 @@ Lists Jules-created pull requests, optionally filtered to a specific repository.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--repo owner/repo` | — | Filter to PRs in this repository |
+| `--repo owner/repo` | - | Filter to PRs in this repository |
 | `--json` | false | Output raw JSON |
 
 **Human output example:**
@@ -450,20 +450,16 @@ bun run src/index.ts prs list --repo acme-org/backend --json
 ```json
 [
   {
-    "number": 42,
-    "title": "Add input validation to POST /users",
-    "state": "open",
-    "url": "https://github.com/acme-org/backend/pull/42",
-    "headRefName": "jules/add-input-validation",
-    "createdAt": "2026-03-28T10:23:45Z"
-  },
-  {
-    "number": 39,
-    "title": "Fix null pointer in UserService.findById",
-    "state": "merged",
-    "url": "https://github.com/acme-org/backend/pull/39",
-    "headRefName": "jules/fix-null-pointer-userservice",
-    "createdAt": "2026-03-27T14:05:12Z"
+    "julesSessionId": "sess_abc123",
+    "julesSessionTitle": "Add input validation to POST /users",
+    "pr": {
+      "url": "https://github.com/acme-org/backend/pull/42",
+      "title": "Add input validation to POST /users",
+      "description": "Added regex validation for email and username fields",
+      "baseRef": "main",
+      "headRef": "jules/add-input-validation"
+    },
+    "ghState": "open"
   }
 ]
 ```
@@ -484,7 +480,7 @@ Shows the details, description, and file diff summary for a pull request.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--repo owner/repo` | — | **Required.** The repository containing the PR |
+| `--repo owner/repo` | - | **Required.** The repository containing the PR |
 | `--json` | false | Output raw JSON |
 
 **Human output example:**
@@ -494,7 +490,7 @@ bun run src/index.ts prs view 42 --repo acme-org/backend
 ```
 
 ```
-PR #42 — Add input validation to POST /users
+PR #42 - Add input validation to POST /users
 
   State:    open
   Branch:   jules/add-input-validation
@@ -547,7 +543,7 @@ Merges a pull request using the `gh` CLI.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--repo owner/repo` | — | **Required.** The repository containing the PR |
+| `--repo owner/repo` | - | **Required.** The repository containing the PR |
 | `--json` | false | Output raw JSON |
 
 **Human output example:**
@@ -595,7 +591,7 @@ Posts a comment on a pull request.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--repo owner/repo` | — | **Required.** The repository containing the PR |
+| `--repo owner/repo` | - | **Required.** The repository containing the PR |
 | `--json` | false | Output raw JSON |
 
 **Human output example:**
@@ -631,4 +627,4 @@ Scheduled sessions are not yet supported by the Jules API. The `/v1alpha/schedul
 
 To schedule recurring jobs, use your own cron or CI scheduler to call `sessions create` on a schedule.
 
-Follow progress at [jules.google.com](https://jules.google.com) — scheduled session support will appear there when it is released.
+Follow progress at [jules.google.com](https://jules.google.com) - scheduled session support will appear there when it is released.

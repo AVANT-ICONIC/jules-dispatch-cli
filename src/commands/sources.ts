@@ -25,12 +25,10 @@ export function registerSourcesCommands(program: Command, config: Config): void 
         const response = await client.listSources();
         if (opts.json) {
           printJson(response.sources);
+        } else if (response.sources.length === 0) {
+          printHuman(['No sources found. Connect a repo at jules.google.com']);
         } else {
-          if (response.sources.length === 0) {
-            printHuman(['No sources found. Connect a repo at jules.google.com']);
-          } else {
-            printHuman(response.sources.map(formatSource));
-          }
+          printHuman(response.sources.map(formatSource));
         }
       } catch (e: any) {
         printError(e.message, 1, opts.json ?? false);

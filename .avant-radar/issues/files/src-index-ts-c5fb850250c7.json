@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-21T00:00:22.255Z",
+  "repo": {
+    "name": "jules-dispatch",
+    "sonarKey": "jules-dispatch"
+  },
+  "file": {
+    "path": "src/index.ts"
+  },
+  "counts": {
+    "total": 3,
+    "bySeverity": {
+      "MINOR": 3
+    },
+    "byType": {
+      "CODE_SMELL": 3
+    }
+  },
+  "issues": [
+    {
+      "key": "7e895cc9-de9c-47f4-a653-c2197f6a44e8",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S4325",
+      "line": 24,
+      "message": "This assertion is unnecessary since it does not change the type of the expression."
+    },
+    {
+      "key": "05b266ce-ba9f-49df-bd04-d349e6f78888",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S4325",
+      "line": 25,
+      "message": "This assertion is unnecessary since it does not change the type of the expression."
+    },
+    {
+      "key": "6e95c948-8760-4f1d-aa07-ebf00913b811",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S4325",
+      "line": 26,
+      "message": "This assertion is unnecessary since it does not change the type of the expression."
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-21T00:00:22.255Z",
+  "repo": {
+    "name": "jules-dispatch",
+    "sonarKey": "jules-dispatch"
+  },
+  "file": {
+    "path": "src/commands/prs.ts"
+  },
+  "counts": {
+    "total": 7,
+    "bySeverity": {
+      "CRITICAL": 1,
+      "MAJOR": 1,
+      "MINOR": 5
+    },
+    "byType": {
+      "CODE_SMELL": 7
+    }
+  },
+  "issues": [
+    {
+      "key": "e6fac611-780d-43fe-8bee-62bac83c2620",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S3776",
+      "line": 26,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 27 to the 15 allowed."
+    },
+    {
+      "key": "b912f0b2-00dd-4193-89a7-992eae0ea855",
+      "severity": "MAJOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S6660",
+      "line": 70,
+      "message": "'If' statement should not be the only statement in 'else' block"
+    },
+    {
+      "key": "1abeb636-0998-44c8-b45c-759b238ba69a",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S7773",
+      "line": 94,
+      "message": "Prefer `Number.parseInt` over `parseInt`."
+    },
+    {
+      "key": "f2a65435-25c6-4431-b117-937c3961468b",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S7773",
+      "line": 120,
+      "message": "Prefer `Number.parseInt` over `parseInt`."
+    },
+    {
+      "key": "287dba68-140c-46f1-9afc-2f6919c8715d",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S7773",
+      "line": 122,
+      "message": "Prefer `Number.parseInt` over `parseInt`."
+    },
+    {
+      "key": "c061fec9-7294-454a-888d-e2fd6a9508a8",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S7773",
+      "line": 139,
+      "message": "Prefer `Number.parseInt` over `parseInt`."
+    },
+    {
+      "key": "3f5f742f-5ced-4b2d-9ece-7fa64627db28",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "rule": "typescript:S7773",
+      "line": 141,
+      "message": "Prefer `Number.parseInt` over `parseInt`."
+    }
+  ]
+}

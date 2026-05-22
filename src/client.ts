@@ -7,9 +7,11 @@ import type {
 } from './types.ts';
 
 const BASE_URL = 'https://jules.googleapis.com/v1alpha';
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
 
 export class JulesClient {
-  private headers: Record<string, string>;
+  private readonly headers: Record<string, string>;
 
   constructor(apiKey: string) {
     this.headers = {
@@ -19,16 +21,39 @@ export class JulesClient {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      ...options,
-      headers: { ...this.headers, ...options.headers },
-    });
-    const data = (await res.json()) as T;
-    if (!res.ok) {
-      const err = data as any;
-      throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        ...options,
+        headers: { ...this.headers, ...options.headers },
+      });
+
+      if (res.status === 429) {
+        const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
+        lastError = new Error(`Rate limited. Retrying in ${delay / 1000}s...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+
+      // Read body as text first — res.json() throws SyntaxError on non-JSON
+      const text = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(
+          `Jules API returned non-JSON response (HTTP ${res.status}): ${text.slice(0, 200)}`
+        );
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.error?.message ?? `HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
+      return data as T;
     }
-    return data;
+
+    throw lastError ?? new Error('Request failed after retries');
   }
 
   listSources(): Promise<ListSourcesResponse> {

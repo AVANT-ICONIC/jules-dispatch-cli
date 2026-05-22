@@ -3,7 +3,7 @@ import type { Config } from '../config.ts';
 import { JulesClient } from '../client.ts';
 import { listOpenPRs, viewPR, mergePR, commentOnPR } from '../github.ts';
 import { printJson, printHuman, printError } from '../output.ts';
-import type { PullRequestOutput } from '../types.ts';
+import type { PullRequestOutput, Session } from '../types.ts';
 
 interface EnrichedPR {
   julesSessionId: string;
@@ -12,12 +12,55 @@ interface EnrichedPR {
   ghState?: string;
 }
 
+/** Extract PR outputs from sessions, optionally filtered by repo. */
+function collectPullRequests(sessions: Session[], repo?: string): EnrichedPR[] {
+  const result: EnrichedPR[] = [];
+  for (const session of sessions) {
+    if (!session.outputs) continue;
+    if (!session.sourceContext?.source) continue;
+
+    if (repo) {
+      const sourceId = `sources/github/${repo}`;
+      if (session.sourceContext.source !== sourceId) continue;
+    }
+
+    for (const output of session.outputs) {
+      if (output.pullRequest) {
+        result.push({
+          julesSessionId: session.id,
+          julesSessionTitle: session.title,
+          pr: output.pullRequest,
+        });
+      }
+    }
+  }
+  return result;
+}
+
+/** Enrich PRs with live GitHub state. Best-effort, mutates in place. */
+async function enrichWithGitHubState(enriched: EnrichedPR[], repo: string): Promise<void> {
+  try {
+    const ghPRs = await listOpenPRs(repo);
+    const ghByHead = new Map(ghPRs.map(p => [p.headRefName, p.state]));
+    for (const e of enriched) {
+      e.ghState = ghByHead.get(e.pr.headRef) ?? 'unknown';
+    }
+  } catch {
+    // gh enrichment is best-effort
+  }
+}
+
+function formatEnrichedPR(e: EnrichedPR): string {
+  const state = e.ghState ? ` [${e.ghState}]` : '';
+  return `${e.pr.url}${state}  ${e.pr.title}`;
+}
+
 export function registerPrsCommands(program: Command, config: Config): void {
   const prs = program
     .command('prs')
     .description('Manage Jules-created pull requests');
 
-  // list — cross-references session outputs for Jules PRs
+  // list - cross-references session outputs for Jules PRs
   prs
     .command('list')
     .description('List open PRs created by Jules (from completed sessions)')
@@ -28,55 +71,18 @@ export function registerPrsCommands(program: Command, config: Config): void {
         const client = new JulesClient(config.julesApiKey);
         const response = await client.listSessions(100);
 
-        const enriched: EnrichedPR[] = [];
-        for (const session of response.sessions) {
-          if (!session.outputs) continue;
-          if (!session.sourceContext?.source) continue;
+        const enriched = collectPullRequests(response.sessions, opts.repo);
 
-          // Optional repo filter
-          if (opts.repo) {
-            const sourceId = `sources/github/${opts.repo}`;
-            if (session.sourceContext.source !== sourceId) continue;
-          }
-
-          for (const output of session.outputs) {
-            if (output.pullRequest) {
-              enriched.push({
-                julesSessionId: session.id,
-                julesSessionTitle: session.title,
-                pr: output.pullRequest,
-              });
-            }
-          }
-        }
-
-        // Enrich with live gh state if we have a repo to query
         if (opts.repo && enriched.length > 0) {
-          try {
-            const ghPRs = await listOpenPRs(opts.repo);
-            // GHPullRequest.headRefName matches PullRequestOutput.headRef — same branch, different field names from each API
-            const ghByHead = new Map(ghPRs.map(p => [p.headRefName, p.state]));
-            for (const e of enriched) {
-              e.ghState = ghByHead.get(e.pr.headRef) ?? 'unknown';
-            }
-          } catch {
-            // gh enrichment is best-effort
-          }
+          await enrichWithGitHubState(enriched, opts.repo);
         }
 
         if (opts.json) {
           printJson(enriched);
+        } else if (enriched.length === 0) {
+          printHuman(['No Jules-created PRs found.']);
         } else {
-          if (enriched.length === 0) {
-            printHuman(['No Jules-created PRs found.']);
-          } else {
-            printHuman(
-              enriched.map(e => {
-                const state = e.ghState ? ` [${e.ghState}]` : '';
-                return `${e.pr.url}${state}  ${e.pr.title}`;
-              })
-            );
-          }
+          printHuman(enriched.map(formatEnrichedPR));
         }
       } catch (e: any) {
         printError(e.message, 1, opts.json ?? false);
@@ -91,7 +97,7 @@ export function registerPrsCommands(program: Command, config: Config): void {
     .option('--json', 'Output raw JSON')
     .action(async (prNumber: string, opts: { repo: string; json?: boolean }) => {
       try {
-        const pr = await viewPR(parseInt(prNumber, 10), opts.repo);
+        const pr = await viewPR(Number.parseInt(prNumber, 10), opts.repo);
         if (opts.json) {
           printJson(pr);
         } else {
@@ -117,9 +123,9 @@ export function registerPrsCommands(program: Command, config: Config): void {
     .option('--json', 'Output raw JSON')
     .action(async (prNumber: string, opts: { repo: string; json?: boolean }) => {
       try {
-        await mergePR(parseInt(prNumber, 10), opts.repo);
+        await mergePR(Number.parseInt(prNumber, 10), opts.repo);
         if (opts.json) {
-          printJson({ ok: true, merged: parseInt(prNumber, 10), repo: opts.repo });
+          printJson({ ok: true, merged: Number.parseInt(prNumber, 10), repo: opts.repo });
         } else {
           printHuman([`PR #${prNumber} merged into ${opts.repo}.`]);
         }
@@ -136,9 +142,9 @@ export function registerPrsCommands(program: Command, config: Config): void {
     .option('--json', 'Output raw JSON')
     .action(async (prNumber: string, message: string, opts: { repo: string; json?: boolean }) => {
       try {
-        await commentOnPR(parseInt(prNumber, 10), opts.repo, message);
+        await commentOnPR(Number.parseInt(prNumber, 10), opts.repo, message);
         if (opts.json) {
-          printJson({ ok: true, pr: parseInt(prNumber, 10), repo: opts.repo });
+          printJson({ ok: true, pr: Number.parseInt(prNumber, 10), repo: opts.repo });
         } else {
           printHuman([`Comment posted on PR #${prNumber}.`]);
         }
