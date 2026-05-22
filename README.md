@@ -25,7 +25,7 @@
   <img src="https://img.shields.io/badge/Bun-1.0+-f9f1e1?style=flat-square&logo=bun&logoColor=black" alt="Bun" />
   <img src="https://img.shields.io/badge/Commander.js-12.x-7c3aed?style=flat-square&logo=npm&logoColor=white" alt="Commander.js" />
   <img src="https://img.shields.io/badge/License-MIT-7c3aed?style=flat-square&logo=opensourceinitiative&logoColor=white" alt="MIT" />
-  <img src="https://img.shields.io/badge/version-0.1.0-7c3aed?style=flat-square" alt="v0.1.0" />
+  <img src="https://img.shields.io/badge/version-1.1.0-7c3aed?style=flat-square" alt="v1.1.0" />
 </p>
 
 <p align="center">

@@ -20,3 +20,6 @@ Thumbs.db
 # Internal development files (Claude Code, planning docs)
 .claude/
 docs/superpowers/
+.avant-radar/
+.scannerwork/
+sonar-project.properties
