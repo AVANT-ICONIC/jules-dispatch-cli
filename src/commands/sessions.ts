@@ -268,4 +268,143 @@ export function registerSessionsCommands(program: Command, config: Config): void
         printError(e.message, 1, opts.json ?? false);
       }
     });
+
+  // outputs — download git patch / file outputs from completed session
+  sessions
+    .command('outputs <session-id>')
+    .description('Download file outputs / git patch from a completed session')
+    .option('--output <file>', 'Write git patch to file instead of stdout')
+    .option('--json', 'Output raw JSON of session outputs')
+    .action(async (sessionId: string, opts: { output?: string; json?: boolean }) => {
+      try {
+        const client = new JulesClient(config.julesApiKey);
+        const session = await client.getSession(sessionId);
+
+        if (!session.outputs || session.outputs.length === 0) {
+          if (opts.json) {
+            printJson({ outputs: [] });
+          } else {
+            printHuman(['No outputs available. Session may still be in progress.']);
+          }
+          return;
+        }
+
+        if (opts.json) {
+          printJson(session.outputs);
+          return;
+        }
+
+        // Find the first changeSet with a git patch
+        for (const output of session.outputs) {
+          if (output.changeSet?.gitPatch?.unidiffPatch) {
+            const patch = output.changeSet.gitPatch.unidiffPatch;
+            if (opts.output) {
+              await Bun.write(opts.output, patch);
+              printHuman([`Git patch written to ${opts.output} (${patch.split('\n').length} lines)`]);
+            } else {
+              console.log(patch);
+            }
+            return;
+          }
+        }
+
+        printHuman(['No git patch found in session outputs.']);
+      } catch (e: any) {
+        printError(e.message, 1, opts.json ?? false);
+      }
+    });
+
+  // run — create a session and poll until completion
+  sessions
+    .command('run')
+    .description('Create a session and poll until completion (one-shot agent workflow)')
+    .option('--repo <owner/repo>', 'Target repository (omit for repoless)')
+    .requiredOption('--prompt <text>', 'Task description for Jules')
+    .option('--branch <branch>', 'Branch to start from', 'main')
+    .option('--title <title>', 'Session title')
+    .option('--automation-mode <mode>', 'Automation mode: AUTO_CREATE_PR')
+    .option('--approve-plan', 'Require plan approval before Jules executes')
+    .option('--env-vars', 'Enable environment variables for the session')
+    .option('--poll-interval <seconds>', 'Seconds between polls', '30')
+    .option('--timeout <seconds>', 'Max seconds to wait before giving up', '600')
+    .option('--json', 'Output raw JSON')
+    .action(async (opts: {
+      repo?: string;
+      prompt: string;
+      branch: string;
+      title?: string;
+      automationMode?: string;
+      approvePlan?: boolean;
+      envVars?: boolean;
+      pollInterval: string;
+      timeout: string;
+      json?: boolean;
+    }) => {
+      try {
+        const client = new JulesClient(config.julesApiKey);
+        const interval = Math.max(10, Number.parseInt(opts.pollInterval, 10) || 30);
+        const timeout = Math.max(30, Number.parseInt(opts.timeout, 10) || 600);
+
+        const sourceContext = opts.repo
+          ? {
+              source: `sources/github/${opts.repo}`,
+              githubRepoContext: { startingBranch: opts.branch },
+              environmentVariablesEnabled: opts.envVars ?? false,
+            }
+          : undefined;
+
+        const session = await client.createSession({
+          prompt: opts.prompt,
+          title: opts.title,
+          sourceContext,
+          requirePlanApproval: opts.approvePlan ?? false,
+          automationMode: opts.automationMode as any,
+        });
+
+        if (!opts.json) {
+          printHuman([`Created session ${session.id}. Polling every ${interval}s (timeout: ${timeout}s)...`]);
+        }
+
+        const deadline = Date.now() + timeout * 1000;
+        const terminalStates: string[] = ['COMPLETED', 'FAILED'];
+
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, interval * 1000));
+          const current = await client.getSession(session.id);
+
+          if (terminalStates.includes(current.state)) {
+            const prUrl = current.outputs?.find(o => o.pullRequest)?.pullRequest?.url;
+
+            if (opts.json) {
+              printJson({
+                sessionId: current.id,
+                state: current.state,
+                title: current.title,
+                prUrl: prUrl ?? null,
+                outputs: current.outputs ?? [],
+              });
+            } else if (current.state === 'COMPLETED') {
+              const lines = [
+                `Session ${current.id} completed.`,
+              ];
+              if (prUrl) {
+                lines.push(`PR: ${prUrl}`);
+              }
+              printHuman(lines);
+            } else {
+              printHuman([`Session ${current.id} failed.`]);
+            }
+            return;
+          }
+
+          if (!opts.json) {
+            printHuman([`  [${current.state}] polling...`]);
+          }
+        }
+
+        printError(`Timed out after ${timeout}s. Session ${session.id} is still in progress. Check with: jules sessions get ${session.id}`, 1, opts.json ?? false);
+      } catch (e: any) {
+        printError(e.message, 1, opts.json ?? false);
+      }
+    });
 }

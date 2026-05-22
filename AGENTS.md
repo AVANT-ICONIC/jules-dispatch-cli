@@ -14,6 +14,35 @@ bun run src/index.ts sources list --json
 If you get a non-empty array, you are authenticated and ready. If you get an error,
 the `.env` file is missing or the API key is invalid - stop and report to the user.
 
+## One-Shot Dispatch (Recommended)
+
+Use `sessions run` to create a session and poll until completion in one command.
+Returns when the session reaches COMPLETED or FAILED:
+
+```bash
+bun run src/index.ts sessions run \
+  --repo OWNER/REPO \
+  --prompt "Detailed task description..." \
+  --title "Short title" \
+  --json
+```
+
+```json
+{
+  "sessionId": "31415926535897932384",
+  "state": "COMPLETED",
+  "title": "Short title",
+  "prUrl": "https://github.com/owner/repo/pull/42",
+  "outputs": [...]
+}
+```
+
+Options: `--poll-interval 30` (default 30s), `--timeout 600` (default 10min).
+
+## Dispatching a Job (Fire-and-Forget)
+
+If you prefer to dispatch and poll manually:
+
 ## Dispatching a Job (Repo Mode)
 
 Jules will execute immediately and open a PR when done:
