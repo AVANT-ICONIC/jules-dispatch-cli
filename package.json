@@ -1,7 +1,7 @@
 {
   "name": "jules-dispatch",
-  "version": "0.1.0",
-  "description": "Agent-first CLI for Google Jules — dispatch jobs, monitor sessions, handle PRs without touching the web UI",
+  "version": "1.0.0",
+  "description": "Agent-first CLI for Google Jules - dispatch jobs, monitor sessions, handle PRs without touching the web UI",
   "license": "MIT",
   "repository": {
     "type": "git",
