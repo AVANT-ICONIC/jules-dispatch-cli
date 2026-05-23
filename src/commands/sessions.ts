@@ -1,39 +1,38 @@
 import type { Command } from 'commander';
 import type { Config } from '../config.ts';
 import { JulesClient } from '../client.ts';
-import { printJson, printHuman, printError } from '../output.ts';
+import { printJson, printHuman, printError, stateDisplay, dim } from '../output.ts';
 import type { Session, Activity } from '../types.ts';
 
 function formatSession(s: Session): string {
   const pr = s.outputs?.find(o => o.pullRequest)?.pullRequest;
-  const prInfo = pr ? `  PR: ${pr.url}` : '';
-  const repo = s.sourceContext.source ?? '(repoless)';
-  return `[${s.state}]  ${s.id}  ${repo}  ${s.title ?? '(no title)'}${prInfo}`;
+  const prInfo = pr ? `  ${dim('PR:')} ${pr.url}` : '';
+  const repo = s.sourceContext.source ?? dim('(repoless)');
+  return `${stateDisplay(s.state)}  ${dim(s.id)}  ${repo}  ${s.title ?? dim('(no title)')}${prInfo}`;
 }
 
 function formatActivity(a: Activity): string {
   const who = a.originator === 'agent' ? 'Jules' : 'User ';
-  let msg = '';
-
-  if (a.planGenerated) {
-    const steps = a.planGenerated.plan.steps.map(s => s.title).join('; ');
-    msg = `Plan generated (${a.planGenerated.plan.steps.length} steps): ${steps}`;
-  } else if (a.planApproved) {
-    msg = `Plan approved: ${a.planApproved.planId}`;
-  } else if (a.progressUpdated) {
-    msg = a.progressUpdated.description
-      ? `${a.progressUpdated.title}: ${a.progressUpdated.description}`
-      : a.progressUpdated.title;
-  } else if (a.agentMessaged) {
-    msg = a.agentMessaged.agentMessage;
-  } else if (a.userMessaged) {
-    msg = a.userMessaged.userMessage;
-  } else {
-    msg = '(unknown activity type)';
+  const time = new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  if ('planGenerated' in a) {
+    const { steps } = a.planGenerated;
+    return `${dim(`[${time}]`)} ${who}generated plan with ${steps.length} steps`;
   }
-
-  const preview = msg.length > 200 ? msg.slice(0, 200) + '...' : msg;
-  return `[${a.createTime}] ${who}: ${preview}`;
+  if ('planApproved' in a) {
+    return `${dim(`[${time}]`)} ${who}approved the plan`;
+  }
+  if ('progressUpdated' in a) {
+    const { title, description } = a.progressUpdated;
+    return `${dim(`[${time}]`)} ${who}updated progress: ${title}${description ? ` - ${description}` : ''}`;
+  }
+  if ('agentMessaged' in a) {
+    return `${dim(`[${time}]`)} ${who}messaged: "${a.agentMessaged}"`;
+  }
+  if ('userMessaged' in a) {
+    return `${dim(`[${time}]`)} ${who}messaged: "${a.userMessaged}"`;
+  }
+  return `${dim(`[${time}]`)} ${who}unknown activity`;
 }
 
 export function registerSessionsCommands(program: Command, config: Config): void {

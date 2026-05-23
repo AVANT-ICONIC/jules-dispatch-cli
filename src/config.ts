@@ -1,18 +1,43 @@
 export interface Config {
   julesApiKey: string;
-
+  profile?: string;
 }
 
-export function loadConfig(): Config {
+async function loadEnvProfile(profile: string): Promise<void> {
+  const envPath = `.env.${profile}`;
+  const file = Bun.file(envPath);
+  if (!(await file.exists())) {
+    throw new Error(
+      `Profile "${profile}" not found. Create ${envPath} with JULES_API_KEY=your_key.`
+    );
+  }
+  const text = await file.text();
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
+
+export async function loadConfig(profile?: string): Promise<Config> {
+  if (profile) {
+    await loadEnvProfile(profile);
+  }
+
   const julesApiKey = process.env.JULES_API_KEY;
 
-
   if (!julesApiKey) {
+    const envName = profile ? `.env.${profile}` : '.env';
     throw new Error(
-      'JULES_API_KEY is not set. Copy .env.example to .env and add your Jules API key.'
+      `JULES_API_KEY is not set. Copy .env.example to ${envName} and add your Jules API key.`
     );
   }
 
-
-  return { julesApiKey };
+  return { julesApiKey, profile };
 }
