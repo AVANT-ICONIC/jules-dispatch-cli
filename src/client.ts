@@ -50,6 +50,7 @@ export class JulesClient {
       if (!res.ok) {
         throw new Error(data?.error?.message ?? `HTTP ${res.status}: ${text.slice(0, 200)}`);
       }
+
       return data as T;
     }
 
@@ -96,6 +97,13 @@ export class JulesClient {
     return this.request(`/sessions/${sessionId}:approvePlan`, {
       method: 'POST',
       body: JSON.stringify({}),
+    });
+  }
+
+  /** Cancel a session (if supported by the API) */
+  cancelSession(sessionId: string): Promise<unknown> {
+    return this.request(`/sessions/${sessionId}:cancel`, {
+      method: 'POST',
     });
   }
 

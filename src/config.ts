@@ -39,12 +39,9 @@ export async function loadConfig(profile?: string): Promise<Config> {
     );
   }
 
-  // Validate API key format (basic validation)
-  if (!julesApiKey.startsWith('ya29.') && !julesApiKey.startsWith('ya27.')) {
-    throw new Error(
-      `Invalid JULES_API_KEY format. Expected a Google OAuth2 access token starting with 'ya29.' or 'ya27.'`
-    );
-  }
+  // Note: We no longer validate the API key format here.
+  // The API will return a more specific error if the token is invalid.
+  // This allows config commands to work even with an invalid or placeholder token.
 
   return { julesApiKey, profile };
 }

@@ -17,12 +17,18 @@ program
 
 // Global options
 program.option('--profile <name>', 'Use a specific profile (loads .env.<name>)');
+program.option('--verbose', 'Enable verbose output');
 
 function initConfig(profile: string | undefined): ReturnType<typeof loadConfig> {
   try {
     return loadConfig(profile);
   } catch (e: any) {
-    console.error(`Error: ${e.message}`);
+    if (program.opts().verbose) {
+      console.error(`Error: ${e.message}`);
+      console.error('Stack trace:', new Error().stack);
+    } else {
+      console.error(`Error: ${e.message}`);
+    }
     process.exit(1);
   }
 }

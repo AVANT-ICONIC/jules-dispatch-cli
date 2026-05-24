@@ -3,13 +3,12 @@ import { loadConfig, Config } from '../config.ts';
 import { printJson, printHuman, printError } from '../output.ts';
 
 export function registerConfigCommands(program: Command): void {
-  program
+  const configCmd = program
     .command('config')
-    .description('Manage Jules CLI configuration')
-    .addAlias('cfg');
+    .description('Manage Jules CLI configuration');
 
-  program
-    .command('config list')
+  configCmd
+    .command('list')
     .description('List current configuration')
     .action(async () => {
       try {
@@ -20,12 +19,19 @@ export function registerConfigCommands(program: Command): void {
           envFile: config.profile ? `.env.${config.profile}` : '.env'
         });
       } catch (error) {
-        printError(error.message, 1, false);
+        // If loadConfig fails, it's likely due to missing API key
+        printHuman([
+          '⚠️  Configuration incomplete',
+          `   Error: ${error.message}`,
+          '',
+          'To set up your configuration, run:',
+          '   jules init'
+        ]);
       }
     });
 
-  program
-    .command('config validate')
+  configCmd
+    .command('validate')
     .description('Validate current configuration')
     .action(async () => {
       try {
@@ -41,8 +47,8 @@ export function registerConfigCommands(program: Command): void {
       }
     });
 
-  program
-    .command('config env <profile>')
+  configCmd
+    .command('env <profile>')
     .description('Show environment variables for a profile')
     .action(async (profile: string) => {
       try {
