@@ -6,6 +6,7 @@ import { registerSessionsCommands } from './commands/sessions.ts';
 import { registerPrsCommands } from './commands/prs.ts';
 import { registerInitCommand } from './commands/init.ts';
 import { registerConfigCommands } from './commands/config.ts';
+import { registerProfileCommands } from './commands/profile.ts';
 
 const program = new Command();
 const pkg = JSON.parse(await Bun.file(new URL('../package.json', import.meta.url)).text());
@@ -40,6 +41,7 @@ registerSessionsCommands(program, config);
 registerPrsCommands(program, config);
 registerInitCommand(program);
 registerConfigCommands(program);
+registerProfileCommands(program);
 
 // Schedules: not yet supported by Jules API
 program
