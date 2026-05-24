@@ -37,6 +37,26 @@ export function registerInitCommand(program: Command): void {
         process.exit(1);
       }
 
+      // Validate API key format
+      if (!apiKey.startsWith('ya29.') && !apiKey.startsWith('ya27.')) {
+        console.log('⚠️  Warning: API key does not look like a valid Google OAuth2 token');
+        console.log('   (should start with ya29. or ya27.)');
+        const confirm = await new Promise<string>((resolve) => {
+          process.stdout.write('Continue anyway? (y/N): ');
+          const stdin = process.openStdin();
+          stdin.addListener('data', (data) => {
+            const answer = data.toString().trim().toLowerCase();
+            resolve(answer);
+            stdin.pause();
+          });
+        });
+        
+        if (confirm !== 'y' && confirm !== 'yes') {
+          console.log('Setup cancelled.');
+          process.exit(1);
+        }
+      }
+
       // Write .env file
       const Bun = await import('bun');
       await Bun.write(envFile, `JULES_API_KEY=${apiKey}\n`);
@@ -59,5 +79,33 @@ export function registerInitCommand(program: Command): void {
       console.log('\n🎉 Setup complete!');
       console.log(`To use this profile, run: jules --profile ${profile} <command>`);
       console.log('To set as default, copy the file to .env or rename it.');
+      
+      // Offer to create config template
+      const createTemplate = await new Promise<string>((resolve) => {
+        process.stdout.write('\nCreate config template file? (y/N): ');
+        const stdin = process.openStdin();
+        stdin.addListener('data', (data) => {
+          const answer = data.toString().trim().toLowerCase();
+          resolve(answer);
+          stdin.pause();
+        });
+      });
+      
+      if (createTemplate === 'y' || createTemplate === 'yes') {
+        const configTemplate = `# Jules CLI Configuration Template
+# Copy to config.json and customize as needed
+{
+  "version": "1.0",
+  "defaultProfile": "${profile}",
+  "features": {
+    "colorOutput": true,
+    "confirmationPrompts": true,
+    "autoCreatePr": false
+  }
+}`;
+        
+        await Bun.write('config.json.example', configTemplate);
+        console.log('✅ Created config.json.example');
+      }
     });
 }

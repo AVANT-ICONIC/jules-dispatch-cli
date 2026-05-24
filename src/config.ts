@@ -39,5 +39,12 @@ export async function loadConfig(profile?: string): Promise<Config> {
     );
   }
 
+  // Validate API key format (basic validation)
+  if (!julesApiKey.startsWith('ya29.') && !julesApiKey.startsWith('ya27.')) {
+    throw new Error(
+      `Invalid JULES_API_KEY format. Expected a Google OAuth2 access token starting with 'ya29.' or 'ya27.'`
+    );
+  }
+
   return { julesApiKey, profile };
 }
