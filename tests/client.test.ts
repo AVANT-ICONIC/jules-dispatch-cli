@@ -22,7 +22,7 @@ describe('JulesClient', () => {
     const client = new JulesClient('my-key');
     await client.listSources();
     expect(spy).toHaveBeenCalledWith(
-      `${BASE}/sources`,
+      `${BASE}/sources?pageSize=100`,
       expect.objectContaining({
         headers: expect.objectContaining({ 'X-Goog-Api-Key': 'my-key' }),
       })
@@ -37,6 +37,31 @@ describe('JulesClient', () => {
       `${BASE}/sessions?pageSize=10`,
       expect.anything()
     );
+  });
+
+  it('listSessions passes an archive filter when supplied', async () => {
+    const spy = mockFetch({ sessions: [] });
+    const client = new JulesClient('my-key');
+    await client.listSessions(100, 'archived = true');
+    expect(spy.mock.calls[0][0]).toBe(
+      `${BASE}/sessions?pageSize=100&filter=archived+%3D+true`,
+    );
+  });
+
+  it('listSources fetches subsequent pages', async () => {
+    const spy = spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ sources: [{ name: 'sources/one' }], nextPageToken: 'next' }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ sources: [{ name: 'sources/two' }] }),
+      } as Response);
+    const client = new JulesClient('my-key');
+    const result = await client.listSources();
+    expect(result.sources).toHaveLength(2);
+    expect(spy.mock.calls[1][0]).toBe(`${BASE}/sources?pageSize=100&pageToken=next`);
   });
 
   it('createSession sends flat payload (no session wrapper)', async () => {
@@ -57,16 +82,16 @@ describe('JulesClient', () => {
     await expect(client.listSources()).rejects.toThrow('Bad field');
   });
 
-  it('replyToSession POSTs userMessaged activity', async () => {
+  it('sendMessage POSTs to the official custom method', async () => {
     const spy = mockFetch({});
     const client = new JulesClient('my-key');
-    await client.replyToSession('sess-1', 'hello Jules');
+    await client.sendMessage('sess-1', 'hello Jules');
     expect(spy).toHaveBeenCalledWith(
-      `${BASE}/sessions/sess-1/activities`,
+      `${BASE}/sessions/sess-1:sendMessage`,
       expect.objectContaining({ method: 'POST' })
     );
     const body = JSON.parse((spy.mock.calls[0][1] as RequestInit).body as string);
-    expect(body.userMessaged.userMessage).toBe('hello Jules');
+    expect(body.prompt).toBe('hello Jules');
   });
 
   it('approvePlan POSTs to :approvePlan endpoint', async () => {
@@ -76,6 +101,27 @@ describe('JulesClient', () => {
     expect(spy).toHaveBeenCalledWith(
       `${BASE}/sessions/sess-2:approvePlan`,
       expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('supports documented archive, unarchive and delete methods', async () => {
+    const spy = mockFetch({});
+    const client = new JulesClient('my-key');
+    await client.archiveSession('sess-3');
+    await client.unarchiveSession('sess-3');
+    await client.deleteSession('sess-3');
+    expect(spy.mock.calls[0][0]).toBe(`${BASE}/sessions/sess-3:archive`);
+    expect(spy.mock.calls[1][0]).toBe(`${BASE}/sessions/sess-3:unarchive`);
+    expect(spy.mock.calls[2][0]).toBe(`${BASE}/sessions/sess-3`);
+    expect((spy.mock.calls[2][1] as RequestInit).method).toBe('DELETE');
+  });
+
+  it('uses an AIP-160 filter for incremental activities', async () => {
+    const spy = mockFetch({ activities: [] });
+    const client = new JulesClient('my-key');
+    await client.listActivities('sess-4', 5, '2026-05-26T00:00:00Z');
+    expect(spy.mock.calls[0][0]).toBe(
+      `${BASE}/sessions/sess-4/activities?pageSize=5&filter=create_time+%3E+%222026-05-26T00%3A00%3A00Z%22`,
     );
   });
 });

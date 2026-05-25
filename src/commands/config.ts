@@ -1,8 +1,16 @@
 import type { Command } from 'commander';
-import { loadConfig, Config } from '../config.ts';
-import { printJson, printHuman, printError } from '../output.ts';
+import type { ConfigLoader } from '../config.ts';
+import { JulesClient } from '../client.ts';
+import { errorMessage, printJson, printHuman, printError } from '../output.ts';
 
-export function registerConfigCommands(program: Command): void {
+function redactEnvironment(text: string): string {
+  return text.replace(
+    /^(\s*[^#=\n]*(?:key|token|secret|password)[^=\n]*\s*=\s*).+$/gim,
+    '$1[REDACTED]',
+  );
+}
+
+export function registerConfigCommands(program: Command, loadConfig: ConfigLoader): void {
   const configCmd = program
     .command('config')
     .description('Manage Jules CLI configuration');
@@ -19,10 +27,9 @@ export function registerConfigCommands(program: Command): void {
           envFile: config.profile ? `.env.${config.profile}` : '.env'
         });
       } catch (error) {
-        // If loadConfig fails, it's likely due to missing API key
         printHuman([
-          '⚠️  Configuration incomplete',
-          `   Error: ${error.message}`,
+          'Configuration incomplete',
+          `   Error: ${errorMessage(error)}`,
           '',
           'To set up your configuration, run:',
           '   jules init'
@@ -36,14 +43,16 @@ export function registerConfigCommands(program: Command): void {
     .action(async () => {
       try {
         const config = await loadConfig();
+        const response = await new JulesClient(config.julesApiKey).listSources();
         printHuman([
-          '✅ Configuration is valid',
+          'Configuration is valid',
           `   Profile: ${config.profile || '[default]'}`,
           `   API Key: ${config.julesApiKey ? '[SET]' : '[NOT SET]'}`,
-          `   Environment File: ${config.profile ? `.env.${config.profile}` : '.env'}`
+          `   Environment File: ${config.profile ? `.env.${config.profile}` : '.env'}`,
+          `   Connected Sources: ${response.sources.length}`,
         ]);
       } catch (error) {
-        printError(`❌ Configuration validation failed: ${error.message}`, 1, false);
+        printError(`Configuration validation failed: ${errorMessage(error)}`, 1, false);
       }
     });
 
@@ -62,12 +71,13 @@ export function registerConfigCommands(program: Command): void {
         }
         
         const text = await file.text();
+        const redacted = redactEnvironment(text);
         printHuman([
           `Environment variables for profile '${profile}':`,
-          text.trim() || '(no variables set)'
+          redacted.trim() || '(no variables set)'
         ]);
       } catch (error) {
-        printError(error.message, 1, false);
+        printError(errorMessage(error), 1, false);
       }
     });
 }

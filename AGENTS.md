@@ -12,12 +12,14 @@ bun run src/index.ts sources list --json
 ```
 
 If you get a non-empty array, you are authenticated and ready. If you get an error,
-the `.env` file is missing or the API key is invalid - stop and report to the user.
+the `.env` file is missing, the API key is invalid, or the service is unavailable -
+stop and report the error to the user.
 
 ## One-Shot Dispatch (Recommended)
 
-Use `sessions run` to create a session and poll until completion in one command.
-Returns when the session reaches COMPLETED or FAILED:
+Use `sessions run` to create a session and poll until completion or operator
+action is needed. It returns at `COMPLETED`, `FAILED`, `AWAITING_PLAN_APPROVAL`,
+`AWAITING_USER_FEEDBACK`, or `PAUSED`:
 
 ```bash
 bun run src/index.ts sessions run \
@@ -119,15 +121,17 @@ Check the `session.state` field:
 
 | State | Meaning | Action |
 |-------|---------|--------|
+| `QUEUED` | Jules accepted the work | Wait and poll again |
 | `IN_PROGRESS` | Jules is working | Wait and poll again |
-| `WAITING_FOR_INPUT` | Jules has a question | Read activities, reply |
-| `PLAN_READY` | Jules generated a plan | Review and approve |
+| `AWAITING_USER_FEEDBACK` | Jules has a question | Read activities, send a message |
+| `AWAITING_PLAN_APPROVAL` | Jules generated a plan | Review and approve |
+| `PAUSED` | Work is paused | Read activities before continuing |
 | `COMPLETED` | Jules finished | Check outputs for PR |
 | `FAILED` | Jules failed | Report to user |
 
 ## Reading Jules's Messages
 
-When state is `WAITING_FOR_INPUT` or `PLAN_READY`:
+When state is `AWAITING_USER_FEEDBACK` or `AWAITING_PLAN_APPROVAL`:
 
 ```bash
 bun run src/index.ts sessions activities SESSION_ID --json
@@ -160,7 +164,7 @@ Prefer the official `message` command (uses `:sendMessage` endpoint):
 bun run src/index.ts sessions message SESSION_ID "Your prompt or answer here" --json
 ```
 
-Legacy `reply` is still available for backwards compatibility:
+`reply` is retained as an alias for the same official message operation:
 
 ```bash
 bun run src/index.ts sessions reply SESSION_ID "Your answer here" --json
@@ -170,6 +174,14 @@ bun run src/index.ts sessions reply SESSION_ID "Your answer here" --json
 
 ```bash
 bun run src/index.ts sessions approve SESSION_ID --json
+```
+
+## Archiving or Deleting a Session
+
+```bash
+bun run src/index.ts sessions archive SESSION_ID --json
+bun run src/index.ts sessions unarchive SESSION_ID --json
+bun run src/index.ts sessions delete SESSION_ID --json
 ```
 
 ## Handling the PR

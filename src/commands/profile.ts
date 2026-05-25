@@ -1,8 +1,24 @@
 import type { Command } from 'commander';
-import { read } from 'fs';
-import { readdir, stat } from 'fs/promises';
-import { join } from 'path';
-import { printJson, printHuman, printError } from '../output.ts';
+import { readdir, rm } from 'fs/promises';
+import { errorMessage, printHuman, printError } from '../output.ts';
+
+async function ask(question: string): Promise<string> {
+  process.stdout.write(question);
+  process.stdin.resume();
+  return new Promise(resolve => {
+    process.stdin.once('data', data => {
+      process.stdin.pause();
+      resolve(data.toString().trim());
+    });
+  });
+}
+
+function redactEnvironment(text: string): string {
+  return text.replace(
+    /^(\s*[^#=\n]*(?:key|token|secret|password)[^=\n]*\s*=\s*).+$/gim,
+    '$1[REDACTED]',
+  );
+}
 
 export function registerProfileCommands(program: Command): void {
   const profileCmd = program
@@ -17,9 +33,8 @@ export function registerProfileCommands(program: Command): void {
         const files = await readdir('.');
         const envFiles = files.filter(file => 
           file.startsWith('.env.') && file.length > 5
-        ).map(file => file.substring(5)); // Remove '.env.' prefix
+        ).map(file => file.substring(5));
         
-        // Also check for default .env
         const hasDefault = files.includes('.env');
         
         const profiles = [
@@ -43,7 +58,7 @@ export function registerProfileCommands(program: Command): void {
           '  jules init                          # Create new profile'
         ]);
       } catch (error) {
-        printError(error.message, 1, false);
+        printError(errorMessage(error), 1, false);
       }
     });
 
@@ -59,15 +74,12 @@ export function registerProfileCommands(program: Command): void {
 
         const envFile = `.env.${name}`;
         const Bun = await import('bun');
-        
-        // Check if file already exists
         const file = Bun.file(envFile);
         if (await file.exists()) {
           printError(`Profile "${name}" already exists at ${envFile}`, 1, false);
           return;
         }
 
-        // Create empty .env file with instructions
         const content = `# Jules CLI Profile: ${name}
 # Add your Jules API key below:
 # JULES_API_KEY=your_api_key_here
@@ -75,7 +87,7 @@ export function registerProfileCommands(program: Command): void {
         await Bun.write(envFile, content);
         
         printHuman([
-          `✅ Created profile "${name}" at ${envFile}`,
+          `Created profile "${name}" at ${envFile}`,
           '',
           'Next steps:',
           `1. Edit ${envFile} and add your Jules API key`,
@@ -83,7 +95,7 @@ export function registerProfileCommands(program: Command): void {
           `3. Use the profile: jules --profile ${name} <command>`
         ]);
       } catch (error) {
-        printError(error.message, 1, false);
+        printError(errorMessage(error), 1, false);
       }
     });
 
@@ -101,7 +113,7 @@ export function registerProfileCommands(program: Command): void {
           return;
         }
         
-        const content = await file.text();
+        const content = redactEnvironment(await file.text());
         printHuman([
           `Profile: ${name}`,
           `File: ${envFile}`,
@@ -109,7 +121,7 @@ export function registerProfileCommands(program: Command): void {
           content.trim() || '(empty)'
         ]);
       } catch (error) {
-        printError(error.message, 1, false);
+        printError(errorMessage(error), 1, false);
       }
     });
 
@@ -132,25 +144,16 @@ export function registerProfileCommands(program: Command): void {
           return;
         }
 
-        // Ask for confirmation
-        const confirm = await new Promise<string>((resolve) => {
-          process.stdout.write(`Are you sure you want to delete profile "${name}"? (y/N): `);
-          const stdin = process.openStdin();
-          stdin.addListener('data', (data) => {
-            const answer = data.toString().trim().toLowerCase();
-            resolve(answer);
-            stdin.pause();
-          });
-        });
+        const confirm = (await ask(`Are you sure you want to delete profile "${name}"? (y/N): `)).toLowerCase();
 
         if (confirm === 'y' || confirm === 'yes') {
-          await Bun.write(envFile, ''); // Clear file content
-          printHuman(`✅ Deleted profile "${name}"`);
+          await rm(envFile);
+          printHuman([`Deleted profile "${name}"`]);
         } else {
-          printHuman('Profile deletion cancelled.');
+          printHuman(['Profile deletion cancelled.']);
         }
       } catch (error) {
-        printError(error.message, 1, false);
+        printError(errorMessage(error), 1, false);
       }
     });
 }

@@ -24,9 +24,11 @@ Every request requires an API key passed as a header:
 X-Goog-Api-Key: YOUR_JULES_API_KEY
 ```
 
-Obtain a key from jules.google.com > Settings > API Keys. Keys are tied to your Jules account and have access to whatever repos you have connected.
+Copy a key from jules.google.com > Settings > API Keys. Keys are tied to your Jules account and have access to whatever repos you have connected.
 
-There is no OAuth flow in this CLI - API key only.
+This CLI uses Jules API-key authentication. A read-only `GET /v1alpha/sources`
+request using a Jules API key and this header was verified successfully against
+the live service on 2026-05-26.
 
 ---
 
@@ -71,13 +73,18 @@ The `title` and `requirePlanApproval` fields are optional. Omitting `title` crea
 
 | State | Description | Requires `requirePlanApproval`? |
 |---|---|---|
+| `STATE_UNSPECIFIED` | No usable state was supplied | No |
+| `QUEUED` | The session is queued | No |
+| `PLANNING` | Deprecated state retained in the schema | No |
+| `AWAITING_PLAN_APPROVAL` | Jules generated a plan and is waiting for `approvePlan` | Yes |
+| `AWAITING_USER_FEEDBACK` | Jules is waiting for a message from the user | No |
 | `IN_PROGRESS` | Jules is actively working on the task | No |
+| `PAUSED` | The session is paused | No |
 | `COMPLETED` | Jules finished and outputs are available | No |
 | `FAILED` | Jules encountered an unrecoverable error | No |
-| `PLAN_READY` | Jules generated a plan and is waiting for `approvePlan` | Yes |
-| `WAITING_FOR_INPUT` | Jules has a question and is waiting for a reply | Yes |
 
-`PLAN_READY` and `WAITING_FOR_INPUT` will never appear on sessions created with `requirePlanApproval: false`. In instant mode, sessions transition directly from `IN_PROGRESS` to either `COMPLETED` or `FAILED`.
+These values match the current API Discovery schema and live read-only session
+responses verified on 2026-05-26.
 
 ---
 
@@ -88,7 +95,12 @@ The activities array does not use a `type` field to distinguish activity kinds. 
 | Key | Sender | Description |
 |---|---|---|
 | `agentMessaged` | Jules | Contains `agentMessage` string - Jules speaking to the user |
-| `userMessaged` | Human or agent | Contains `userMessage` string - a reply sent via the reply endpoint |
+| `userMessaged` | Human or agent | Contains `userMessage` string - a message sent to Jules |
+| `planGenerated` | Jules | Contains the generated plan and its steps |
+| `planApproved` | User | Identifies the approved plan |
+| `progressUpdated` | Jules | Contains progress title and optional description |
+| `sessionCompleted` | Jules | Signals completion |
+| `sessionFailed` | Jules | Signals failure with an optional reason |
 
 To determine who sent an activity, check which key is present:
 
@@ -118,25 +130,37 @@ Request body can be empty `{}`.
 
 ---
 
-## Reply Endpoint
+## Message Endpoint
 
-To send a message to Jules when the session is in `WAITING_FOR_INPUT`:
+To send a message to Jules, including while a session is in
+`AWAITING_USER_FEEDBACK`:
 
 ```
-POST /v1alpha/sessions/SESSION_ID/activities
+POST /v1alpha/sessions/SESSION_ID:sendMessage
 ```
 
 Request body:
 
 ```json
 {
-  "userMessaged": {
-    "userMessage": "Your answer or instruction here"
-  }
+  "prompt": "Your answer or instruction here"
 }
 ```
 
-The body mirrors the discriminated union structure of the activities response - the `userMessaged` key wraps your message. Do not send a flat `{ "message": "..." }` - it will be ignored.
+The CLI exposes this through `sessions message`; `sessions reply` is an alias
+for the same supported operation.
+
+---
+
+## Session Lifecycle Endpoints
+
+The current API exposes lifecycle methods for storing or removing sessions:
+
+```
+POST   /v1alpha/sessions/SESSION_ID:archive
+POST   /v1alpha/sessions/SESSION_ID:unarchive
+DELETE /v1alpha/sessions/SESSION_ID
+```
 
 ---
 
@@ -169,7 +193,8 @@ This full name is what you pass as `sourceContext.source` when creating a sessio
 
 ## Pagination
 
-The sources list and sessions list endpoints both support pagination via query parameters:
+The sources, sessions, and activities list endpoints support pagination via
+query parameters:
 
 ```
 ?pageSize=100&pageToken=TOKEN_FROM_PREVIOUS_RESPONSE
@@ -177,7 +202,18 @@ The sources list and sessions list endpoints both support pagination via query p
 
 A response with more pages includes `nextPageToken` in the response body. When `nextPageToken` is absent (or empty), you have fetched all results.
 
-This CLI uses `pageSize=100` and does not implement multi-page fetching. If you have more than 100 sessions or sources, only the first 100 will be returned. This is a known limitation.
+This CLI requests `pageSize=100` and automatically follows `nextPageToken` for
+sources and sessions.
+
+Session listing can request active sessions (the API default), archived
+sessions, or both through the `archived` filter exposed by
+`sessions list --archived`.
+
+For incremental activity polling, use the API's supported filter expression:
+
+```
+?filter=create_time%20%3E%20%222026-05-26T00%3A00%3A00Z%22
+```
 
 ---
 
@@ -220,7 +256,6 @@ Common status codes encountered in practice:
 ## Known v1alpha Limitations
 
 - No schedules endpoint (404)
-- No pagination in this CLI (pageSize=100 cap)
 - No streaming - all responses are synchronous snapshots; poll to track progress
 - Session IDs are opaque strings - do not try to parse structure from them
-- Sessions cannot be cancelled or deleted via the API
+- Session record lifecycle operations are archive, unarchive, and delete

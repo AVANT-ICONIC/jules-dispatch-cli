@@ -6,7 +6,7 @@ This guide is for AI agents - Claude Code, Codex, Gemini, or any orchestration s
 
 ## Core Principles
 
-1. **Always use `--json`** - every command supports it. Human-readable output contains formatting noise that is expensive to parse. JSON output is clean, typed, and stable.
+1. **Always use `--json` for workflow commands** - human-readable output contains formatting noise that is expensive to parse. JSON output is clean, typed, and stable.
 
 2. **Never poll faster than 30 seconds** - Jules is an async agent. It runs in the cloud and typically takes 2–10 minutes per job. Polling faster does not speed it up and wastes tokens reading identical state.
 
@@ -35,9 +35,10 @@ This guide is for AI agents - Claude Code, Codex, Gemini, or any orchestration s
 │    → read .session.state                             │
 └──────────┬────────┬──────────┬────────────┬──────────┘
            │        │          │            │
-     IN_PROGRESS  PLAN_READY  WAITING_   COMPLETED / FAILED
-     (wait)       (approve)   FOR_INPUT  (see step 4)
-                              (reply)
+     IN_PROGRESS  AWAITING_   AWAITING_  COMPLETED / FAILED
+     (wait)       PLAN_       USER_      (see step 4)
+                  APPROVAL    FEEDBACK
+                  (approve)   (message)
 ┌──────────────────────────────▼───────────────────────┐
 │ 4. COMPLETED:                                        │
 │    → read .session.outputs[].pullRequest.url         │
@@ -56,13 +57,15 @@ This guide is for AI agents - Claude Code, Codex, Gemini, or any orchestration s
 
 | State | Meaning | What to Do |
 |---|---|---|
+| `QUEUED` | Jules accepted the work | Wait 30s, poll again |
 | `IN_PROGRESS` | Jules is actively working | Wait 30s, poll again |
-| `PLAN_READY` | Jules has generated a plan and is waiting for approval | Read activities, then call `sessions approve` |
-| `WAITING_FOR_INPUT` | Jules has a question and cannot proceed | Read activities to find Jules's question, then call `sessions reply` |
+| `AWAITING_PLAN_APPROVAL` | Jules has generated a plan and is waiting for approval | Read activities, then call `sessions approve` |
+| `AWAITING_USER_FEEDBACK` | Jules has a question and cannot proceed | Read activities, then call `sessions message` |
+| `PAUSED` | Jules has paused work | Read activities and determine the required action |
 | `COMPLETED` | Jules finished successfully | Read `session.outputs` for PR URL, then review/merge |
 | `FAILED` | Jules encountered an error it could not recover from | Read activities for the error message; consider retrying with a more specific prompt |
 
-`PLAN_READY` and `WAITING_FOR_INPUT` only appear when the session was created with `--approve-plan`. In instant mode (default), Jules moves directly from `IN_PROGRESS` to `COMPLETED` or `FAILED`.
+Plan approval sessions use `AWAITING_PLAN_APPROVAL`. A session needing additional instructions uses `AWAITING_USER_FEEDBACK`.
 
 ---
 
@@ -87,8 +90,7 @@ When a session completes, `sessions get SESSION_ID --json` already contains the 
     "outputs": [
       {
         "pullRequest": {
-          "url": "https://github.com/acme-org/backend/pull/42",
-          "number": 42
+          "url": "https://github.com/acme-org/backend/pull/42"
         }
       }
     ]
@@ -113,13 +115,16 @@ The `--limit` flag on `sessions activities` keeps responses small. The default i
 bun run src/index.ts sessions activities "$SESSION" --limit 5 --json
 ```
 
+Use `--create-time ISO_TIMESTAMP` to fetch newer activity records through the
+Jules `create_time` filter when polling an active session.
+
 ### Use `sessions list --state` to triage
 
 Before diving into individual sessions, get an overview of what is active:
 
 ```bash
 bun run src/index.ts sessions list --state IN_PROGRESS --json
-bun run src/index.ts sessions list --state WAITING_FOR_INPUT --json
+bun run src/index.ts sessions list --state AWAITING_USER_FEEDBACK --json
 ```
 
 This is more efficient than calling `sessions get` on every session ID you know about.
@@ -175,7 +180,8 @@ fi
 
 ## Example Agent Script
 
-The following bash script dispatches a job to Jules and polls until it completes, then reports the PR URL.
+The following bash script dispatches a job to Jules and polls until it completes
+or requires operator action, then reports the available outcome.
 
 ```bash
 #!/usr/bin/env bash
@@ -211,18 +217,23 @@ while true; do
       echo "Check activities: bun run src/index.ts sessions activities $SESSION"
       exit 1
       ;;
-    WAITING_FOR_INPUT)
+    AWAITING_USER_FEEDBACK)
       echo "Jules needs input. Showing recent activities:"
       bun run src/index.ts sessions activities "$SESSION" --limit 5
       echo ""
-      echo "Reply with: bun run src/index.ts sessions reply $SESSION \"your answer\""
+      echo "Reply with: bun run src/index.ts sessions message $SESSION \"your answer\""
       exit 2
       ;;
-    PLAN_READY)
+    AWAITING_PLAN_APPROVAL)
       echo "Plan ready. Approving automatically..."
       bun run src/index.ts sessions approve "$SESSION" --json
       ;;
-    IN_PROGRESS)
+    PAUSED)
+      echo "Session paused. Review activities before continuing:"
+      bun run src/index.ts sessions activities "$SESSION" --limit 5
+      exit 2
+      ;;
+    QUEUED|IN_PROGRESS)
       # Normal - keep polling
       ;;
     *)
@@ -236,7 +247,7 @@ done
 
 - `0` - completed successfully, PR URL printed
 - `1` - Jules failed
-- `2` - Jules needs human input (only if `--approve-plan` was used)
+- `2` - Jules needs an approval, feedback, or a resume decision
 
 ---
 
@@ -252,4 +263,4 @@ Same approach. All commands are synchronous from the shell's perspective - they 
 
 ### CI/CD pipelines
 
-In GitHub Actions or similar, set `JULES_API_KEY` and `GITHUB_USERNAME` as repository secrets and expose them as environment variables. The CLI reads them from the environment (no `.env` file needed if the vars are already exported).
+In GitHub Actions or similar, set `JULES_API_KEY` as a repository secret and expose it as an environment variable. The CLI reads it from the environment (no `.env` file needed if the variable is already exported).

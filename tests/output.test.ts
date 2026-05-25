@@ -36,7 +36,8 @@ describe('printError', () => {
     const spy = spyOn(console, 'error').mockImplementation(() => {});
     const exit = spyOn(process, 'exit').mockImplementation((() => {}) as any);
     printError('something broke', 1, false);
-    expect(spy).toHaveBeenCalledWith('Error: something broke');
+    expect(spy.mock.calls[0][0]).toContain('Error:');
+    expect(spy.mock.calls[0][0]).toContain('something broke');
     expect(exit).toHaveBeenCalledWith(1);
     spy.mockRestore();
     exit.mockRestore();

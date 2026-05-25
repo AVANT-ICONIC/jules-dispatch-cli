@@ -1,13 +1,17 @@
 // Jules API - Session states
 export type SessionState =
+  | 'STATE_UNSPECIFIED'
+  | 'QUEUED'
+  | 'PLANNING'
+  | 'AWAITING_PLAN_APPROVAL'
+  | 'AWAITING_USER_FEEDBACK'
   | 'IN_PROGRESS'
+  | 'PAUSED'
   | 'COMPLETED'
-  | 'WAITING_FOR_INPUT'
-  | 'PLAN_READY'
   | 'FAILED';
 
 // Jules API - Automation mode for session creation
-export type AutomationMode = 'AUTO_CREATE_PR';
+export type AutomationMode = 'AUTOMATION_MODE_UNSPECIFIED' | 'AUTO_CREATE_PR';
 
 // Jules API - Source (connected GitHub repo)
 export interface GitHubRepo {
@@ -37,6 +41,7 @@ export interface GitHubRepoContext {
 export interface SourceContext {
   source?: string;
   githubRepoContext?: GitHubRepoContext;
+  workingBranch?: string;
   environmentVariablesEnabled?: boolean;
 }
 
@@ -66,11 +71,13 @@ export interface Session {
   createTime: string;
   updateTime: string;
   state: SessionState;
-  sourceContext: SourceContext;
+  sourceContext?: SourceContext;
   prompt: string;
   url: string;
   outputs?: SessionOutput[];
   automationMode?: AutomationMode;
+  archived?: boolean;
+  requirePlanApproval?: boolean;
 }
 
 export interface ListSessionsResponse {
@@ -91,6 +98,7 @@ export interface UserMessaged {
 export interface PlanStep {
   id: string;
   title: string;
+  description?: string;
   index?: number;
 }
 
@@ -98,6 +106,7 @@ export interface PlanGenerated {
   plan: {
     id: string;
     steps: PlanStep[];
+    createTime?: string;
   };
 }
 
@@ -114,6 +123,7 @@ export interface BashOutputArtifact {
   bashOutput: {
     command: string;
     output: string;
+    exitCode?: number;
   };
 }
 
@@ -129,18 +139,23 @@ export interface ChangeSetArtifact {
 
 export type Artifact = BashOutputArtifact | ChangeSetArtifact;
 
+export interface SessionFailed {
+  reason?: string;
+}
+
 export interface Activity {
   name: string;
   id: string;
   createTime: string;
-  originator: 'agent' | 'user';
-  // Legacy discriminated union fields (still present in API)
+  description?: string;
+  originator: string;
   agentMessaged?: AgentMessaged;
   userMessaged?: UserMessaged;
-  // New discriminated union fields (post-January 2026)
   planGenerated?: PlanGenerated;
   planApproved?: PlanApproved;
   progressUpdated?: ProgressUpdated;
+  sessionCompleted?: Record<string, never>;
+  sessionFailed?: SessionFailed;
   artifacts?: Artifact[];
 }
 

@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
-import type { Config } from '../config.ts';
+import type { ConfigLoader } from '../config.ts';
 import { JulesClient } from '../client.ts';
-import { printJson, printHuman, printError } from '../output.ts';
+import { errorMessage, printJson, printHuman, printError } from '../output.ts';
 import type { Source } from '../types.ts';
 
 function formatSource(s: Source): string {
@@ -10,7 +10,7 @@ function formatSource(s: Source): string {
   return `${s.githubRepo.owner}/${s.githubRepo.repo}  [${visibility}]  default: ${branch}`;
 }
 
-export function registerSourcesCommands(program: Command, config: Config): void {
+export function registerSourcesCommands(program: Command, loadConfig: ConfigLoader): void {
   const sources = program
     .command('sources')
     .description('Manage Jules-connected GitHub repositories');
@@ -21,6 +21,7 @@ export function registerSourcesCommands(program: Command, config: Config): void 
     .option('--json', 'Output raw JSON')
     .action(async (opts: { json?: boolean }) => {
       try {
+        const config = await loadConfig();
         const client = new JulesClient(config.julesApiKey);
         const response = await client.listSources();
         if (opts.json) {
@@ -30,8 +31,8 @@ export function registerSourcesCommands(program: Command, config: Config): void 
         } else {
           printHuman(response.sources.map(formatSource));
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 }

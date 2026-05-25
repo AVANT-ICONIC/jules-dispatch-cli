@@ -3,6 +3,8 @@ export interface Config {
   profile?: string;
 }
 
+export type ConfigLoader = () => Promise<Config>;
+
 async function loadEnvProfile(profile: string): Promise<void> {
   const envPath = `.env.${profile}`;
   const file = Bun.file(envPath);
@@ -19,9 +21,7 @@ async function loadEnvProfile(profile: string): Promise<void> {
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
     const value = trimmed.slice(eq + 1).trim();
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
+    process.env[key] = value;
   }
 }
 
@@ -38,10 +38,6 @@ export async function loadConfig(profile?: string): Promise<Config> {
       `JULES_API_KEY is not set. Copy .env.example to ${envName} and add your Jules API key.`
     );
   }
-
-  // Note: We no longer validate the API key format here.
-  // The API will return a more specific error if the token is invalid.
-  // This allows config commands to work even with an invalid or placeholder token.
 
   return { julesApiKey, profile };
 }

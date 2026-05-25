@@ -16,11 +16,13 @@ const CYAN = '\x1b[36m';
 /** Map session state to color + emoji for human output */
 export function stateDisplay(state: string): string {
   switch (state) {
+    case 'QUEUED':         return `${DIM}QUEUED${RESET}`;
+    case 'AWAITING_PLAN_APPROVAL': return `${CYAN}AWAITING_PLAN_APPROVAL${RESET}`;
+    case 'AWAITING_USER_FEEDBACK': return `${YELLOW}AWAITING_USER_FEEDBACK${RESET}`;
     case 'IN_PROGRESS':    return `${BLUE}⟳ IN_PROGRESS${RESET}`;
+    case 'PAUSED':         return `${YELLOW}PAUSED${RESET}`;
     case 'COMPLETED':      return `${GREEN}✓ COMPLETED${RESET}`;
     case 'FAILED':         return `${RED}✗ FAILED${RESET}`;
-    case 'WAITING_FOR_INPUT': return `${YELLOW}? WAITING_FOR_INPUT${RESET}`;
-    case 'PLAN_READY':     return `${CYAN}📋 PLAN_READY${RESET}`;
     default:               return `${DIM}${state}${RESET}`;
   }
 }
@@ -31,6 +33,10 @@ export function dim(text: string): string {
 
 export function bold(text: string): string {
   return `${BOLD}${text}${RESET}`;
+}
+
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** Machine-readable output (agent mode). Compact single-line JSON. */

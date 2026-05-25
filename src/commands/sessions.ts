@@ -1,41 +1,96 @@
 import type { Command } from 'commander';
-import type { Config } from '../config.ts';
+import type { ConfigLoader } from '../config.ts';
 import { JulesClient } from '../client.ts';
-import { printJson, printHuman, printError, stateDisplay, dim } from '../output.ts';
-import type { Session, Activity } from '../types.ts';
+import { errorMessage, printJson, printHuman, printError, stateDisplay, dim } from '../output.ts';
+import type { AutomationMode, Session, Activity } from '../types.ts';
+
+const FILTER_STATES = [
+  'STATE_UNSPECIFIED',
+  'QUEUED',
+  'PLANNING',
+  'AWAITING_PLAN_APPROVAL',
+  'AWAITING_USER_FEEDBACK',
+  'IN_PROGRESS',
+  'PAUSED',
+  'COMPLETED',
+  'FAILED',
+  'ALL',
+];
+
+async function createClient(loadConfig: ConfigLoader): Promise<JulesClient> {
+  const config = await loadConfig();
+  return new JulesClient(config.julesApiKey);
+}
+
+function automationMode(mode?: string): AutomationMode | undefined {
+  if (mode === undefined) return undefined;
+  if (mode !== 'AUTO_CREATE_PR') {
+    throw new Error('Invalid --automation-mode. Valid value: AUTO_CREATE_PR.');
+  }
+  return mode;
+}
+
+function archiveFilter(value?: string): string | undefined {
+  switch (value ?? 'active') {
+    case 'active':
+      return undefined;
+    case 'archived':
+      return 'archived = true';
+    case 'all':
+      return 'archived = true OR archived = false';
+    default:
+      throw new Error('Invalid --archived value. Valid values: active, archived, all.');
+  }
+}
 
 function formatSession(s: Session): string {
   const pr = s.outputs?.find(o => o.pullRequest)?.pullRequest;
   const prInfo = pr ? `  ${dim('PR:')} ${pr.url}` : '';
-  const repo = s.sourceContext.source ?? dim('(repoless)');
+  const repo = s.sourceContext?.source ?? dim('(repoless)');
   return `${stateDisplay(s.state)}  ${dim(s.id)}  ${repo}  ${s.title ?? dim('(no title)')}${prInfo}`;
 }
 
 function formatActivity(a: Activity): string {
-  const who = a.originator === 'agent' ? 'Jules' : 'User ';
-  const time = new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const who = a.originator === 'agent' ? 'Jules' : a.originator === 'user' ? 'User' : 'System';
+  const time = new Date(a.createTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const prefix = `${dim(`[${time}]`)} ${who} `;
   
-  if ('planGenerated' in a) {
-    const { steps } = a.planGenerated;
-    return `${dim(`[${time}]`)} ${who}generated plan with ${steps.length} steps`;
+  if (a.planGenerated) {
+    return `${prefix}generated plan with ${a.planGenerated.plan.steps.length} steps`;
   }
-  if ('planApproved' in a) {
-    return `${dim(`[${time}]`)} ${who}approved the plan`;
+  if (a.planApproved) {
+    return `${prefix}approved the plan`;
   }
-  if ('progressUpdated' in a) {
-    const { title, description } = a.progressUpdated;
-    return `${dim(`[${time}]`)} ${who}updated progress: ${title}${description ? ` - ${description}` : ''}`;
+  if (a.progressUpdated) {
+    const detail = a.progressUpdated.description ? ` - ${a.progressUpdated.description}` : '';
+    return `${prefix}updated progress: ${a.progressUpdated.title}${detail}`;
   }
-  if ('agentMessaged' in a) {
-    return `${dim(`[${time}]`)} ${who}messaged: "${a.agentMessaged}"`;
+  if (a.agentMessaged) {
+    return `${prefix}messaged: "${a.agentMessaged.agentMessage}"`;
   }
-  if ('userMessaged' in a) {
-    return `${dim(`[${time}]`)} ${who}messaged: "${a.userMessaged}"`;
+  if (a.userMessaged) {
+    return `${prefix}messaged: "${a.userMessaged.userMessage}"`;
   }
-  return `${dim(`[${time}]`)} ${who}unknown activity`;
+  if (a.sessionCompleted) {
+    return `${prefix}completed the session`;
+  }
+  if (a.sessionFailed) {
+    const detail = a.sessionFailed.reason ? `: ${a.sessionFailed.reason}` : '';
+    return `${prefix}reported session failure${detail}`;
+  }
+  return `${prefix}${a.description ?? 'recorded activity'}`;
 }
 
-export function registerSessionsCommands(program: Command, config: Config): void {
+function formatOutputs(session: Session): string[] {
+  if (!session.outputs?.length) return ['(none)'];
+  return session.outputs.flatMap(output => {
+    if (output.pullRequest) return [`Pull Request: ${output.pullRequest.url}`];
+    if (output.changeSet) return ['Change set: git patch available via `sessions outputs`'];
+    return [];
+  });
+}
+
+export function registerSessionsCommands(program: Command, loadConfig: ConfigLoader): void {
   const sessions = program
     .command('sessions')
     .description('Manage Jules sessions');
@@ -45,23 +100,23 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .command('list')
     .description('List Jules sessions')
     .option('--repo <owner/repo>', 'Filter by repository')
-    .option('--state <state>', 'Filter by state: IN_PROGRESS, COMPLETED, WAITING_FOR_INPUT, PLAN_READY, FAILED, ALL', 'ALL')
+    .option('--state <state>', `Filter by state: ${FILTER_STATES.join(', ')}`, 'ALL')
+    .option('--archived <scope>', 'Session visibility: active, archived, all', 'active')
     .option('--json', 'Output raw JSON')
-    .action(async (opts: { repo?: string; state?: string; json?: boolean }) => {
+    .action(async (opts: { repo?: string; state?: string; archived?: string; json?: boolean }) => {
       try {
-        const VALID_STATES = ['IN_PROGRESS', 'COMPLETED', 'WAITING_FOR_INPUT', 'PLAN_READY', 'FAILED', 'ALL'];
-        const stateValid = !opts.state || VALID_STATES.includes(opts.state);
+        const stateValid = !opts.state || FILTER_STATES.includes(opts.state);
         if (opts.state && !stateValid) {
-          console.error(`Warning: unknown state "${opts.state}". Valid values: ${VALID_STATES.join(', ')}. Showing all states.`);
+          console.error(`Warning: unknown state "${opts.state}". Valid values: ${FILTER_STATES.join(', ')}. Showing all states.`);
         }
 
-        const client = new JulesClient(config.julesApiKey);
-        const response = await client.listSessions(100);
+        const client = await createClient(loadConfig);
+        const response = await client.listSessions(100, archiveFilter(opts.archived));
         let list = response.sessions;
 
         if (opts.repo) {
           const sourceId = `sources/github/${opts.repo}`;
-          list = list.filter(s => s.sourceContext.source === sourceId);
+          list = list.filter(s => s.sourceContext?.source === sourceId);
         }
         if (opts.state && stateValid && opts.state !== 'ALL') {
           list = list.filter(s => s.state === opts.state);
@@ -74,8 +129,8 @@ export function registerSessionsCommands(program: Command, config: Config): void
         } else {
           printHuman(list.map(formatSession));
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -86,7 +141,7 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .option('--json', 'Output raw JSON')
     .action(async (sessionId: string, opts: { json?: boolean }) => {
       try {
-        const client = new JulesClient(config.julesApiKey);
+        const client = await createClient(loadConfig);
         const [session, activitiesRes] = await Promise.all([
           client.getSession(sessionId),
           client.listActivities(sessionId, 10),
@@ -94,21 +149,25 @@ export function registerSessionsCommands(program: Command, config: Config): void
         if (opts.json) {
           printJson({ session, activities: activitiesRes.activities });
         } else {
-          const repo = session.sourceContext.source ?? '(repoless)';
+          const repo = session.sourceContext?.source ?? '(repoless)';
           printHuman([
             `ID:      ${session.id}`,
             `Title:   ${session.title ?? '(no title)'}`,
             `State:   ${session.state}`,
             `Repo:    ${repo}`,
+            `Created: ${session.createTime}`,
             `Updated: ${session.updateTime}`,
             `URL:     ${session.url}`,
+            '',
+            '--- Outputs ---',
+            ...formatOutputs(session),
             '',
             '--- Recent Activities ---',
             ...activitiesRes.activities.map(formatActivity),
           ]);
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -135,7 +194,7 @@ export function registerSessionsCommands(program: Command, config: Config): void
       json?: boolean;
     }) => {
       try {
-        const client = new JulesClient(config.julesApiKey);
+        const client = await createClient(loadConfig);
 
         const sourceContext = opts.repo
           ? {
@@ -150,7 +209,7 @@ export function registerSessionsCommands(program: Command, config: Config): void
           title: opts.title,
           sourceContext,
           requirePlanApproval: opts.approvePlan ?? false,
-          automationMode: opts.automationMode as any,
+          automationMode: automationMode(opts.automationMode),
         });
 
         if (opts.json) {
@@ -160,6 +219,8 @@ export function registerSessionsCommands(program: Command, config: Config): void
             `Session created:`,
             `  ID:    ${session.id}`,
             `  State: ${session.state}`,
+            `  Repo:  ${opts.repo ?? '(repoless)'}`,
+            `  Title: ${session.title ?? '(no title)'}`,
             `  URL:   ${session.url}`,
           ];
           if (opts.automationMode) {
@@ -168,7 +229,7 @@ export function registerSessionsCommands(program: Command, config: Config): void
           if (opts.approvePlan) {
             lines.push(
               ``,
-              `Plan approval required. Jules will pause at PLAN_READY state.`,
+              `Plan approval required. Jules will pause at AWAITING_PLAN_APPROVAL state.`,
               `Review and approve with: jules sessions approve ${session.id}`,
             );
           } else {
@@ -179,8 +240,8 @@ export function registerSessionsCommands(program: Command, config: Config): void
           }
           printHuman(lines);
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -191,34 +252,91 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .option('--json', 'Output raw JSON')
     .action(async (sessionId: string, prompt: string, opts: { json?: boolean }) => {
       try {
-        const client = new JulesClient(config.julesApiKey);
+        const client = await createClient(loadConfig);
         await client.sendMessage(sessionId, prompt);
         if (opts.json) {
           printJson({ ok: true, sessionId });
         } else {
           printHuman([`Message sent to session ${sessionId}.`]);
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
-  // reply — legacy endpoint, kept for backwards compatibility
+  // reply - compatibility alias for message
   sessions
     .command('reply <session-id> <message>')
-    .description('Send a message to Jules (legacy endpoint)')
+    .description('Send a message to Jules (alias for sessions message)')
     .option('--json', 'Output raw JSON')
     .action(async (sessionId: string, message: string, opts: { json?: boolean }) => {
       try {
-        const client = new JulesClient(config.julesApiKey);
-        await client.replyToSession(sessionId, message);
+        const client = await createClient(loadConfig);
+        await client.sendMessage(sessionId, message);
         if (opts.json) {
           printJson({ ok: true, sessionId });
         } else {
           printHuman([`Message sent to session ${sessionId}.`]);
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
+      }
+    });
+
+  // archive
+  sessions
+    .command('archive <session-id>')
+    .description('Archive a session')
+    .option('--json', 'Output raw JSON')
+    .action(async (sessionId: string, opts: { json?: boolean }) => {
+      try {
+        const client = await createClient(loadConfig);
+        const session = await client.archiveSession(sessionId);
+        if (opts.json) {
+          printJson(session);
+        } else {
+          printHuman([`Session ${sessionId} archived.`]);
+        }
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
+      }
+    });
+
+  // unarchive
+  sessions
+    .command('unarchive <session-id>')
+    .description('Restore an archived session')
+    .option('--json', 'Output raw JSON')
+    .action(async (sessionId: string, opts: { json?: boolean }) => {
+      try {
+        const client = await createClient(loadConfig);
+        const session = await client.unarchiveSession(sessionId);
+        if (opts.json) {
+          printJson(session);
+        } else {
+          printHuman([`Session ${sessionId} unarchived.`]);
+        }
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
+      }
+    });
+
+  // delete
+  sessions
+    .command('delete <session-id>')
+    .description('Permanently delete a session')
+    .option('--json', 'Output raw JSON')
+    .action(async (sessionId: string, opts: { json?: boolean }) => {
+      try {
+        const client = await createClient(loadConfig);
+        await client.deleteSession(sessionId);
+        if (opts.json) {
+          printJson({ ok: true, sessionId });
+        } else {
+          printHuman([`Session ${sessionId} deleted.`]);
+        }
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -229,15 +347,15 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .option('--json', 'Output raw JSON')
     .action(async (sessionId: string, opts: { json?: boolean }) => {
       try {
-        const client = new JulesClient(config.julesApiKey);
+        const client = await createClient(loadConfig);
         await client.approvePlan(sessionId);
         if (opts.json) {
           printJson({ ok: true, sessionId });
         } else {
           printHuman([`Plan approved. Jules is now executing session ${sessionId}.`]);
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -254,7 +372,7 @@ export function registerSessionsCommands(program: Command, config: Config): void
         if (!Number.isFinite(pageSize) || pageSize < 1) {
           printError(`Invalid --limit "${opts.limit}". Must be a positive number.`, 1, opts.json ?? false);
         }
-        const client = new JulesClient(config.julesApiKey);
+        const client = await createClient(loadConfig);
         const response = await client.listActivities(sessionId, pageSize, opts.createTime);
         if (opts.json) {
           printJson(response.activities);
@@ -263,8 +381,8 @@ export function registerSessionsCommands(program: Command, config: Config): void
         } else {
           printHuman(response.activities.map(formatActivity));
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -276,7 +394,7 @@ export function registerSessionsCommands(program: Command, config: Config): void
     .option('--json', 'Output raw JSON of session outputs')
     .action(async (sessionId: string, opts: { output?: string; json?: boolean }) => {
       try {
-        const client = new JulesClient(config.julesApiKey);
+        const client = await createClient(loadConfig);
         const session = await client.getSession(sessionId);
 
         if (!session.outputs || session.outputs.length === 0) {
@@ -308,15 +426,15 @@ export function registerSessionsCommands(program: Command, config: Config): void
         }
 
         printHuman(['No git patch found in session outputs.']);
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
-  // run — create a session and poll until completion
+  // run - create a session and poll until completion or an action is required
   sessions
     .command('run')
-    .description('Create a session and poll until completion (one-shot agent workflow)')
+    .description('Create a session and poll until completion or action is required')
     .option('--repo <owner/repo>', 'Target repository (omit for repoless)')
     .requiredOption('--prompt <text>', 'Task description for Jules')
     .option('--branch <branch>', 'Branch to start from', 'main')
@@ -340,7 +458,7 @@ export function registerSessionsCommands(program: Command, config: Config): void
       json?: boolean;
     }) => {
       try {
-        const client = new JulesClient(config.julesApiKey);
+        const client = await createClient(loadConfig);
         const interval = Math.max(10, Number.parseInt(opts.pollInterval, 10) || 30);
         const timeout = Math.max(30, Number.parseInt(opts.timeout, 10) || 600);
 
@@ -357,7 +475,7 @@ export function registerSessionsCommands(program: Command, config: Config): void
           title: opts.title,
           sourceContext,
           requirePlanApproval: opts.approvePlan ?? false,
-          automationMode: opts.automationMode as any,
+          automationMode: automationMode(opts.automationMode),
         });
 
         if (!opts.json) {
@@ -365,13 +483,19 @@ export function registerSessionsCommands(program: Command, config: Config): void
         }
 
         const deadline = Date.now() + timeout * 1000;
-        const terminalStates: string[] = ['COMPLETED', 'FAILED'];
+        const returnStates = new Set([
+          'COMPLETED',
+          'FAILED',
+          'AWAITING_PLAN_APPROVAL',
+          'AWAITING_USER_FEEDBACK',
+          'PAUSED',
+        ]);
 
         while (Date.now() < deadline) {
           await new Promise(r => setTimeout(r, interval * 1000));
           const current = await client.getSession(session.id);
 
-          if (terminalStates.includes(current.state)) {
+          if (returnStates.has(current.state)) {
             const prUrl = current.outputs?.find(o => o.pullRequest)?.pullRequest?.url;
 
             if (opts.json) {
@@ -390,8 +514,23 @@ export function registerSessionsCommands(program: Command, config: Config): void
                 lines.push(`PR: ${prUrl}`);
               }
               printHuman(lines);
-            } else {
+            } else if (current.state === 'FAILED') {
               printHuman([`Session ${current.id} failed.`]);
+            } else if (current.state === 'AWAITING_PLAN_APPROVAL') {
+              printHuman([
+                `Session ${current.id} is awaiting plan approval.`,
+                `Review activities, then approve with: jules sessions approve ${current.id}`,
+              ]);
+            } else if (current.state === 'AWAITING_USER_FEEDBACK') {
+              printHuman([
+                `Session ${current.id} is awaiting feedback.`,
+                `Read activities, then send a message with: jules sessions message ${current.id} "..."`,
+              ]);
+            } else {
+              printHuman([
+                `Session ${current.id} is paused.`,
+                `Read activities before continuing: jules sessions activities ${current.id}`,
+              ]);
             }
             return;
           }
@@ -401,9 +540,9 @@ export function registerSessionsCommands(program: Command, config: Config): void
           }
         }
 
-        printError(`Timed out after ${timeout}s. Session ${session.id} is still in progress. Check with: jules sessions get ${session.id}`, 1, opts.json ?? false);
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+        printError(`Timed out after ${timeout}s. Session ${session.id} has not reached a return state. Check with: jules sessions get ${session.id}`, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 }

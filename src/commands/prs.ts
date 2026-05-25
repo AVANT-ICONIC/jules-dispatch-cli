@@ -1,8 +1,8 @@
 import type { Command } from 'commander';
-import type { Config } from '../config.ts';
+import type { ConfigLoader } from '../config.ts';
 import { JulesClient } from '../client.ts';
 import { listOpenPRs, viewPR, mergePR, commentOnPR } from '../github.ts';
-import { printJson, printHuman, printError } from '../output.ts';
+import { errorMessage, printJson, printHuman, printError } from '../output.ts';
 import type { PullRequestOutput, Session } from '../types.ts';
 
 interface EnrichedPR {
@@ -55,7 +55,7 @@ function formatEnrichedPR(e: EnrichedPR): string {
   return `${e.pr.url}${state}  ${e.pr.title}`;
 }
 
-export function registerPrsCommands(program: Command, config: Config): void {
+export function registerPrsCommands(program: Command, loadConfig: ConfigLoader): void {
   const prs = program
     .command('prs')
     .description('Manage Jules-created pull requests');
@@ -68,6 +68,7 @@ export function registerPrsCommands(program: Command, config: Config): void {
     .option('--json', 'Output raw JSON')
     .action(async (opts: { repo?: string; json?: boolean }) => {
       try {
+        const config = await loadConfig();
         const client = new JulesClient(config.julesApiKey);
         const response = await client.listSessions(100);
 
@@ -84,8 +85,8 @@ export function registerPrsCommands(program: Command, config: Config): void {
         } else {
           printHuman(enriched.map(formatEnrichedPR));
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -110,8 +111,8 @@ export function registerPrsCommands(program: Command, config: Config): void {
             pr.body ?? '',
           ]);
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -129,8 +130,8 @@ export function registerPrsCommands(program: Command, config: Config): void {
         } else {
           printHuman([`PR #${prNumber} merged into ${opts.repo}.`]);
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 
@@ -148,8 +149,8 @@ export function registerPrsCommands(program: Command, config: Config): void {
         } else {
           printHuman([`Comment posted on PR #${prNumber}.`]);
         }
-      } catch (e: any) {
-        printError(e.message, 1, opts.json ?? false);
+      } catch (error) {
+        printError(errorMessage(error), 1, opts.json ?? false);
       }
     });
 }

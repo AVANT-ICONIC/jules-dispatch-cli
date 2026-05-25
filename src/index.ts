@@ -7,40 +7,26 @@ import { registerPrsCommands } from './commands/prs.ts';
 import { registerInitCommand } from './commands/init.ts';
 import { registerConfigCommands } from './commands/config.ts';
 import { registerProfileCommands } from './commands/profile.ts';
+import pkg from '../package.json' with { type: 'json' };
 
 const program = new Command();
-const pkg = JSON.parse(await Bun.file(new URL('../package.json', import.meta.url)).text());
 
 program
   .name('jules')
-  .description('Agent-first CLI for Google Jules.\nDocs: https://github.com/AVANT-ICONIC/jules-dispatch')
+  .description('Agent-first CLI for Google Jules.\nDocs: https://github.com/AVANT-ICONIC/jules-dispatch-cli')
   .version(pkg.version);
 
 // Global options
 program.option('--profile <name>', 'Use a specific profile (loads .env.<name>)');
 program.option('--verbose', 'Enable verbose output');
 
-function initConfig(profile: string | undefined): ReturnType<typeof loadConfig> {
-  try {
-    return loadConfig(profile);
-  } catch (e: any) {
-    if (program.opts().verbose) {
-      console.error(`Error: ${e.message}`);
-      console.error('Stack trace:', new Error().stack);
-    } else {
-      console.error(`Error: ${e.message}`);
-    }
-    process.exit(1);
-  }
-}
+const configured = () => loadConfig(program.opts().profile);
 
-const config = initConfig(program.opts().profile);
-
-registerSourcesCommands(program, config);
-registerSessionsCommands(program, config);
-registerPrsCommands(program, config);
+registerSourcesCommands(program, configured);
+registerSessionsCommands(program, configured);
+registerPrsCommands(program, configured);
 registerInitCommand(program);
-registerConfigCommands(program);
+registerConfigCommands(program, configured);
 registerProfileCommands(program);
 
 // Schedules: not yet supported by Jules API

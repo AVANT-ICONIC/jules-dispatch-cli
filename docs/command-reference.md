@@ -6,7 +6,24 @@ All commands follow this pattern:
 bun run src/index.ts <group> <subcommand> [options]
 ```
 
-Every command accepts `--json` to output machine-readable JSON with no human-readable formatting. Use this in scripts and agent workflows.
+API and PR workflow commands accept `--json` to output machine-readable JSON with no human-readable formatting. Use this in scripts and agent workflows.
+
+---
+
+## setup
+
+| Command | Description |
+|---|---|
+| `init` | Interactive API-key setup that validates access by listing sources |
+| `config list` | Show whether a default credential is configured |
+| `config validate` | Validate the credential with a read-only Jules API request |
+| `config env <profile>` | Display profile configuration with secrets redacted |
+| `profile list` | List available default and named profiles |
+| `profile create <name>` | Create a named profile template |
+| `profile show <name>` | Show a named profile with secrets redacted |
+| `profile delete <name>` | Delete a named profile |
+
+Use a named credential with `jules --profile <name> <command>`.
 
 ---
 
@@ -29,11 +46,9 @@ bun run src/index.ts sources list
 ```
 
 ```
-Connected sources (3)
-
-  github/acme-org/backend
-  github/acme-org/frontend
-  github/my-username/side-project
+acme-org/backend  [public]  default: main
+acme-org/frontend  [private]  default: main
+my-username/side-project  [public]  default: main
 ```
 
 **JSON output example:**
@@ -63,7 +78,8 @@ Lists Jules sessions, optionally filtered by repository and/or state.
 | Flag | Default | Description |
 |---|---|---|
 | `--repo owner/repo` | - | Filter to sessions for this repository |
-| `--state STATE` | `ALL` | Filter by state: `IN_PROGRESS`, `COMPLETED`, `WAITING_FOR_INPUT`, `PLAN_READY`, `FAILED`, or `ALL` |
+| `--state STATE` | `ALL` | Filter by current state, including `QUEUED`, `AWAITING_PLAN_APPROVAL`, `AWAITING_USER_FEEDBACK`, `IN_PROGRESS`, `PAUSED`, `COMPLETED`, `FAILED`, or `ALL` |
+| `--archived SCOPE` | `active` | Select `active`, `archived`, or `all` sessions |
 | `--json` | false | Output raw JSON |
 
 **Human output example:**
@@ -73,9 +89,7 @@ bun run src/index.ts sessions list --repo acme-org/backend --state IN_PROGRESS
 ```
 
 ```
-Sessions (1)
-
-  sess_abc123  IN_PROGRESS   acme-org/backend   Add input validation to POST /users
+IN_PROGRESS  sess_abc123  sources/github/acme-org/backend  Add input validation to POST /users
 ```
 
 **JSON output example:**
@@ -121,24 +135,19 @@ bun run src/index.ts sessions get sess_abc123def456
 ```
 
 ```
-Session sess_abc123def456
+ID:      sess_abc123def456
+Title:   Add input validation to POST /users
+State:   COMPLETED
+Repo:    sources/github/acme-org/backend
+Created: 2026-03-28T10:15:00Z
+Updated: 2026-03-28T10:23:45Z
+URL:     https://jules.google.com/sessions/sess_abc123def456
 
-  State:   COMPLETED
-  Title:   Add input validation to POST /users
-  Repo:    acme-org/backend
-  Created: 2026-03-28T10:15:00Z
-  Updated: 2026-03-28T10:23:45Z
+--- Outputs ---
+Pull Request: https://github.com/acme-org/backend/pull/42
 
-Outputs
-
-  Pull Request: https://github.com/acme-org/backend/pull/42
-
-Recent Activity (3)
-
-  [agent] I've added email validation using a regex and username validation
-          that rejects special characters. Tests are included.
-  [agent] Opening pull request...
-  [agent] Done! Pull request is ready for review.
+--- Recent Activities ---
+[10:22 AM] Jules messaged: "Done! Pull request is ready for review."
 ```
 
 **JSON output example:**
@@ -158,8 +167,7 @@ bun run src/index.ts sessions get sess_abc123def456 --json
     "outputs": [
       {
         "pullRequest": {
-          "url": "https://github.com/acme-org/backend/pull/42",
-          "number": 42
+          "url": "https://github.com/acme-org/backend/pull/42"
         }
       }
     ]
@@ -198,7 +206,7 @@ Creates a new Jules session and dispatches a job.
 
 - **Instant mode** (default, no `--approve-plan`): Jules reads your prompt, generates a plan internally, and immediately begins executing. You skip the review step. Use this when you trust Jules to make straightforward changes.
 
-- **Plan review mode** (`--approve-plan`): Jules pauses after generating a plan and waits for you to call `sessions approve`. The session enters `PLAN_READY` state. Use this when you want to verify Jules's approach before it touches any code.
+- **Plan review mode** (`--approve-plan`): Jules pauses after generating a plan and waits for you to call `sessions approve`. The session enters `AWAITING_PLAN_APPROVAL` state. Use this when you want to verify Jules's approach before it touches any code.
 
 **Human output example (instant mode):**
 
@@ -210,12 +218,13 @@ bun run src/index.ts sessions create \
 ```
 
 ```
-Session created
+Session created:
 
-  ID:     sess_abc123def456
-  State:  IN_PROGRESS
-  Repo:   acme-org/backend
-  Title:  Add input validation
+  ID:    sess_abc123def456
+  State: IN_PROGRESS
+  Repo:  acme-org/backend
+  Title: Add input validation
+  URL:   https://jules.google.com/sessions/sess_abc123def456
 ```
 
 **Repoless example (no --repo):**
@@ -227,11 +236,13 @@ bun run src/index.ts sessions create \
 ```
 
 ```
-Session created
+Session created:
 
-  ID:     sess_repoless_abc
-  State:  IN_PROGRESS
-  URL:    https://jules.google.com/sessions/sess_repoless_abc
+  ID:    sess_repoless_abc
+  State: IN_PROGRESS
+  Repo:  (repoless)
+  Title: IPv6 validator
+  URL:   https://jules.google.com/sessions/sess_repoless_abc
 ```
 
 **Human output example (plan review mode):**
@@ -244,14 +255,15 @@ bun run src/index.ts sessions create \
 ```
 
 ```
-Session created
+Session created:
 
-  ID:     sess_xyz789ghi012
-  State:  IN_PROGRESS
-  Repo:   acme-org/backend
-  Title:  (untitled)
+  ID:    sess_xyz789ghi012
+  State: IN_PROGRESS
+  Repo:  acme-org/backend
+  Title: (no title)
+  URL:   https://jules.google.com/sessions/sess_xyz789ghi012
 
-  Note: Plan approval required. Jules will pause at PLAN_READY state.
+  Note: Plan approval required. Jules will pause at AWAITING_PLAN_APPROVAL state.
         Run: bun run src/index.ts sessions approve sess_xyz789ghi012
 ```
 
@@ -294,7 +306,7 @@ Sends a message to Jules using the official `:sendMessage` API endpoint. **Prefe
 **Human output example:**
 
 ```bash
-bun run src/index.ts sessions message sess_abc123def456 "Can you make the app corgi themed?"
+bun run src/index.ts sessions message sess_abc123def456 "Please use the dark theme."
 ```
 
 ```
@@ -304,7 +316,7 @@ Message sent to session sess_abc123def456.
 **JSON output example:**
 
 ```bash
-bun run src/index.ts sessions message sess_abc123def456 "Corgi theme please" --json
+bun run src/index.ts sessions message sess_abc123def456 "Please use the dark theme." --json
 ```
 
 ```json
@@ -318,7 +330,8 @@ bun run src/index.ts sessions message sess_abc123def456 "Corgi theme please" --j
 
 ### `sessions reply`
 
-Sends a message to Jules when the session is in `WAITING_FOR_INPUT` state. **Legacy endpoint — prefer `sessions message` for new integrations.**
+Alias for `sessions message`. Both commands use the official `:sendMessage`
+endpoint; use `message` in new scripts for clarity.
 
 
 
@@ -365,7 +378,7 @@ bun run src/index.ts sessions reply sess_abc123def456 "Use the existing validato
 
 ### `sessions approve`
 
-Approves Jules's plan when the session is in `PLAN_READY` state. Jules will then begin execution.
+Approves Jules's plan when the session is in `AWAITING_PLAN_APPROVAL` state. Jules will then begin execution.
 
 **Arguments:**
 
@@ -379,7 +392,7 @@ Approves Jules's plan when the session is in `PLAN_READY` state. Jules will then
 |---|---|---|
 | `--json` | false | Output raw JSON |
 
-**When to use:** Only valid when you created the session with `--approve-plan` and the session is currently in `PLAN_READY` state. Run `sessions activities` first to read Jules's proposed plan.
+**When to use:** Only valid when you created the session with `--approve-plan` and the session is currently in `AWAITING_PLAN_APPROVAL` state. Run `sessions activities` first to read Jules's proposed plan.
 
 **Human output example:**
 
@@ -403,7 +416,7 @@ bun run src/index.ts sessions approve sess_xyz789ghi012 --json
 ```json
 {
   "ok": true,
-  "sessionState": "IN_PROGRESS"
+  "sessionId": "sess_xyz789ghi012"
 }
 ```
 
@@ -424,6 +437,7 @@ Lists the activity log for a session - Jules's messages, your replies, and syste
 | Flag | Default | Description |
 |---|---|---|
 | `--limit N` | `20` | Maximum number of activities to return |
+| `--create-time ISO_TIMESTAMP` | - | Return activities newer than the timestamp |
 | `--json` | false | Output raw JSON |
 
 **Human output example:**
@@ -472,6 +486,47 @@ bun run src/index.ts sessions activities sess_abc123def456 --json
 ```
 
 Activities use a discriminated union - check which key is present (`agentMessaged` vs `userMessaged`) to determine who sent the message.
+
+---
+
+### `sessions outputs`
+
+Returns the output records for a session or writes its first available Git
+patch to a file.
+
+```bash
+bun run src/index.ts sessions outputs SESSION_ID --json
+bun run src/index.ts sessions outputs SESSION_ID --output changes.patch
+```
+
+### `sessions run`
+
+Creates a session and polls until it reaches `COMPLETED`, `FAILED`, or a state
+that requires action: `AWAITING_PLAN_APPROVAL`, `AWAITING_USER_FEEDBACK`, or
+`PAUSED`.
+
+```bash
+bun run src/index.ts sessions run \
+  --repo acme-org/backend \
+  --prompt "Fix typo in README" \
+  --json
+```
+
+Use `--poll-interval` and `--timeout` to control polling. With `--json`, the
+returned object always includes the state so an agent can approve a plan, send
+feedback, or inspect a paused session before continuing.
+
+### `sessions archive`, `sessions unarchive`, `sessions delete`
+
+Manage stored sessions using the Jules lifecycle endpoints:
+
+```bash
+bun run src/index.ts sessions archive SESSION_ID --json
+bun run src/index.ts sessions unarchive SESSION_ID --json
+bun run src/index.ts sessions delete SESSION_ID --json
+```
+
+`delete` permanently removes the specified session.
 
 ---
 

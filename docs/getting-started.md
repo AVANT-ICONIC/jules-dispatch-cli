@@ -14,7 +14,7 @@ Before you begin, make sure you have the following:
 | **gh CLI** | Install from [cli.github.com](https://cli.github.com) and run `gh auth login` |
 | **Jules account** | Sign up at [jules.google.com](https://jules.google.com) |
 | **Jules GitHub App** | Install it on the repos you want Jules to work on (Settings > Integrations inside Jules) |
-| **Jules API key** | Generate one at jules.google.com > Settings > API Keys |
+| **Jules API key** | Copy one from jules.google.com > Settings > API Keys |
 
 ---
 
@@ -23,8 +23,8 @@ Before you begin, make sure you have the following:
 Clone the repo, install dependencies, and configure your environment:
 
 ```bash
-git clone https://github.com/AVANT-ICONIC/jules-dispatch
-cd jules-dispatch
+git clone https://github.com/AVANT-ICONIC/jules-dispatch-cli
+cd jules-dispatch-cli
 bun install
 cp .env.example .env
 ```
@@ -33,8 +33,10 @@ Open `.env` and fill in your credentials:
 
 ```bash
 JULES_API_KEY=your_jules_api_key_here
-GITHUB_USERNAME=your_github_username
 ```
+
+Alternatively, run `bun run src/index.ts init` to create and verify a default
+or named API-key profile interactively.
 
 ---
 
@@ -43,20 +45,20 @@ GITHUB_USERNAME=your_github_username
 Run the following to confirm everything is wired up correctly:
 
 ```bash
-bun run src/index.ts sources list
+bun run src/index.ts sources list --json
 ```
 
-Expected output - your connected repositories:
+Expected JSON output - your connected repositories:
 
-```
-Connected sources (2)
-
-  github/acme-org/backend
-  github/acme-org/frontend
+```json
+[
+  { "name": "sources/github/acme-org/backend" },
+  { "name": "sources/github/acme-org/frontend" }
+]
 ```
 
 If you see an error instead, check that:
-- Your `JULES_API_KEY` in `.env` is valid and not expired
+- Your `JULES_API_KEY` in `.env` was copied from Jules Settings > API Keys
 - The Jules GitHub App is installed on at least one of your repos
 - Your `gh` CLI is authenticated (`gh auth status`)
 
@@ -113,12 +115,13 @@ bun run src/index.ts sessions create \
 Jules will respond with a session ID:
 
 ```
-Session created
+Session created:
 
-  ID:     sess_abc123def456
-  State:  IN_PROGRESS
-  Repo:   acme-org/backend
-  Title:  Add input validation to POST /users
+  ID:    sess_abc123def456
+  State: IN_PROGRESS
+  Repo:  acme-org/backend
+  Title: Add input validation to POST /users
+  URL:   https://jules.google.com/sessions/sess_abc123def456
 ```
 
 Save that session ID.
@@ -128,7 +131,7 @@ Save that session ID.
 Jules works asynchronously - jobs typically take 2–10 minutes. Poll with:
 
 ```bash
-bun run src/index.ts sessions get sess_abc123def456
+bun run src/index.ts sessions get sess_abc123def456 --json
 ```
 
 You will see the current state and recent activity. Wait until state is `COMPLETED`.
@@ -143,7 +146,7 @@ When the session completes:
 bun run src/index.ts sessions get sess_abc123def456
 ```
 
-The output will include a `Outputs` section with a PR URL. You can also list PRs directly:
+The JSON output includes `session.outputs` with a PR URL. You can also list PRs directly:
 
 ```bash
 bun run src/index.ts prs list --repo acme-org/backend

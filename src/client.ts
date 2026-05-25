@@ -57,12 +57,31 @@ export class JulesClient {
     throw lastError ?? new Error('Request failed after retries');
   }
 
-  listSources(): Promise<ListSourcesResponse> {
-    return this.request('/sources');
+  async listSources(pageSize = 100): Promise<ListSourcesResponse> {
+    const sources: ListSourcesResponse['sources'] = [];
+    let pageToken: string | undefined;
+    do {
+      const params = new URLSearchParams({ pageSize: String(pageSize) });
+      if (pageToken) params.set('pageToken', pageToken);
+      const response = await this.request<ListSourcesResponse>(`/sources?${params}`);
+      sources.push(...response.sources);
+      pageToken = response.nextPageToken;
+    } while (pageToken);
+    return { sources };
   }
 
-  listSessions(pageSize = 50): Promise<ListSessionsResponse> {
-    return this.request(`/sessions?pageSize=${pageSize}`);
+  async listSessions(pageSize = 100, filter?: string): Promise<ListSessionsResponse> {
+    const sessions: ListSessionsResponse['sessions'] = [];
+    let pageToken: string | undefined;
+    do {
+      const params = new URLSearchParams({ pageSize: String(pageSize) });
+      if (pageToken) params.set('pageToken', pageToken);
+      if (filter) params.set('filter', filter);
+      const response = await this.request<ListSessionsResponse>(`/sessions?${params}`);
+      sessions.push(...response.sessions);
+      pageToken = response.nextPageToken;
+    } while (pageToken);
+    return { sessions };
   }
 
   getSession(sessionId: string): Promise<Session> {
@@ -85,14 +104,6 @@ export class JulesClient {
     });
   }
 
-  /** @deprecated Legacy reply endpoint. Prefer sendMessage for new integrations. */
-  replyToSession(sessionId: string, message: string): Promise<unknown> {
-    return this.request(`/sessions/${sessionId}/activities`, {
-      method: 'POST',
-      body: JSON.stringify({ userMessaged: { userMessage: message } }),
-    });
-  }
-
   approvePlan(sessionId: string): Promise<unknown> {
     return this.request(`/sessions/${sessionId}:approvePlan`, {
       method: 'POST',
@@ -100,10 +111,23 @@ export class JulesClient {
     });
   }
 
-  /** Cancel a session (if supported by the API) */
-  cancelSession(sessionId: string): Promise<unknown> {
-    return this.request(`/sessions/${sessionId}:cancel`, {
+  archiveSession(sessionId: string): Promise<Session> {
+    return this.request(`/sessions/${sessionId}:archive`, {
       method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  unarchiveSession(sessionId: string): Promise<Session> {
+    return this.request(`/sessions/${sessionId}:unarchive`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  deleteSession(sessionId: string): Promise<unknown> {
+    return this.request(`/sessions/${sessionId}`, {
+      method: 'DELETE',
     });
   }
 
@@ -112,10 +136,10 @@ export class JulesClient {
     pageSize = 20,
     createTime?: string,
   ): Promise<ListActivitiesResponse> {
-    let path = `/sessions/${sessionId}/activities?pageSize=${pageSize}`;
+    const params = new URLSearchParams({ pageSize: String(pageSize) });
     if (createTime) {
-      path += `&createTime=${encodeURIComponent(createTime)}`;
+      params.set('filter', `create_time > "${createTime}"`);
     }
-    return this.request(path);
+    return this.request(`/sessions/${sessionId}/activities?${params}`);
   }
 }

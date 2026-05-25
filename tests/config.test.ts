@@ -11,13 +11,13 @@ describe('loadConfig', () => {
   it('throws when JULES_API_KEY is missing', async () => {
     delete process.env.JULES_API_KEY;
     const { loadConfig } = await import('../src/config');
-    expect(() => loadConfig()).toThrow('JULES_API_KEY');
+    await expect(loadConfig()).rejects.toThrow('JULES_API_KEY');
   });
 
   it('returns config with julesApiKey when set', async () => {
     process.env.JULES_API_KEY = 'test-key';
     const { loadConfig } = await import('../src/config');
-    const config = loadConfig();
+    const config = await loadConfig();
     expect(config.julesApiKey).toBe('test-key');
   });
 });
