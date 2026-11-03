@@ -1,5 +1,5 @@
 import { describe, it, expect, spyOn } from 'bun:test';
-import { printJson, printHuman, printError } from '../src/output';
+import { printJson, printHuman, printError, stateDisplay, errorMessage } from '../src/output';
 
 describe('printJson', () => {
   it('logs compact JSON to stdout', () => {
@@ -41,5 +41,40 @@ describe('printError', () => {
     expect(exit).toHaveBeenCalledWith(1);
     spy.mockRestore();
     exit.mockRestore();
+  });
+});
+
+describe('stateDisplay', () => {
+  const knownStates = [
+    'QUEUED',
+    'AWAITING_PLAN_APPROVAL',
+    'AWAITING_USER_FEEDBACK',
+    'IN_PROGRESS',
+    'PAUSED',
+    'COMPLETED',
+    'FAILED',
+  ];
+
+  for (const state of knownStates) {
+    it(`returns the state name for ${state}`, () => {
+      expect(stateDisplay(state)).toContain(state);
+    });
+  }
+
+  it('passes an unknown state through', () => {
+    expect(stateDisplay('SOMETHING_ELSE')).toContain('SOMETHING_ELSE');
+  });
+});
+
+describe('errorMessage', () => {
+  it('returns error.message for an Error', () => {
+    expect(errorMessage(new Error('boom'))).toBe('boom');
+  });
+
+  it('returns String(x) for anything else', () => {
+    expect(errorMessage('plain')).toBe('plain');
+    expect(errorMessage(42)).toBe('42');
+    expect(errorMessage(null)).toBe('null');
+    expect(errorMessage(undefined)).toBe('undefined');
   });
 });
