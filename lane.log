@@ -1,0 +1,21 @@
+node:internal/modules/esm/resolve:275
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/fleet-power-gate.mjs' imported from /Users/valunex/Desktop/GitHub/agent-runs/night01/projects/jules-dispatch-cli/gen-perf-jules-terminal-429-delay/
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:989:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+    at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:680:36)
+    at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+    at ModuleLoader.import (node:internal/modules/esm/loader:679:21)
+    at node:internal/modules/run_main:179:35 {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///fleet-power-gate.mjs'
+}
+
+Node.js v22.23.4
+POWER REFUSED pool=cursor2 account=cursoraut key=UNREAD level=unreadable -- the provider registry could not resolve this account
